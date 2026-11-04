@@ -44,6 +44,105 @@ openspec/changes/{change-id}/
 
 Backend Agent 的详细职责与规则见 [`.cursor/rules/backend.md`](.cursor/rules/backend.md)。
 
+## 技术栈
+
+- 运行时：Node.js 22+（ESM / NodeNext）
+- 框架：[NestJS](https://nestjs.com/)（Controller / Service / Repository 分层）
+- 语言：TypeScript（strict）
+- 数据库：MySQL，ORM 为 [Prisma](https://www.prisma.io/)（v7，通过 `@prisma/adapter-mariadb` 驱动适配器连接 MySQL/MariaDB）
+- 校验：class-validator / class-transformer（全局 `ValidationPipe`）
+- 认证基础库：`@nestjs/jwt` + `passport-jwt`（具体登录/鉴权业务逻辑待对应 OpenSpec Change 落地）
+- 日志：`nestjs-pino`（结构化日志）
+- 健康检查：`@nestjs/terminus`，暴露 `GET /health`（含数据库连通性检查）
+- API 文档（开发期辅助）：`@nestjs/swagger`，暴露 `GET /docs`；**正式 API Contract 以 `docs/api.md` 及 `docs/api/` 为准**（见下文）
+- 包管理：pnpm
+- 测试：Vitest（单元测试 + e2e）
+- Lint/格式化：oxlint + prettier
+
+统一响应结构（Response Envelope）、业务错误码、全局异常过滤器已在 `src/common/` 下搭好基础设施，具体业务错误码由各 OpenSpec Change 实现时补充（见 `.cursor/rules/backend.md` 第 27-29 节）。
+
+## 本地开发
+
+### 1. 安装依赖
+
+```bash
+pnpm install
+```
+
+### 2. 准备 MySQL
+
+二选一：
+
+**方式 A：使用本机已安装的 MySQL**（当前本地开发默认方式）
+
+确保存在以下数据库与账号（utf8mb4）：
+
+```sql
+CREATE DATABASE IF NOT EXISTS home_exchange CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER IF NOT EXISTS 'home_exchange'@'localhost' IDENTIFIED BY 'home_exchange';
+CREATE USER IF NOT EXISTS 'home_exchange'@'127.0.0.1' IDENTIFIED BY 'home_exchange';
+GRANT ALL PRIVILEGES ON home_exchange.* TO 'home_exchange'@'localhost';
+GRANT ALL PRIVILEGES ON home_exchange.* TO 'home_exchange'@'127.0.0.1';
+-- Prisma `migrate dev` 需要创建 shadow database，本地开发环境建议直接授予全局权限：
+GRANT ALL PRIVILEGES ON *.* TO 'home_exchange'@'localhost';
+GRANT ALL PRIVILEGES ON *.* TO 'home_exchange'@'127.0.0.1';
+FLUSH PRIVILEGES;
+```
+
+**方式 B：使用 Docker Compose**（适合没有本机 MySQL、或想要一个干净可复现环境的情况）
+
+```bash
+pnpm db:up    # docker compose up -d mysql
+# 用完后
+pnpm db:down  # docker compose down
+```
+
+两种方式的账号密码约定一致（见 `docker-compose.yml` 与 `.env.example`），只需保证 `.env` 中的 `DATABASE_URL` 指向你实际在用的那一个。
+
+### 3. 配置环境变量
+
+```bash
+cp .env.example .env
+# 按需修改 .env，本地默认值已经可以直接跑起来
+```
+
+### 4. 生成 Prisma Client / 执行迁移
+
+```bash
+pnpm prisma:generate       # 生成 Prisma Client 到 src/generated/prisma（已 gitignore，按需重新生成）
+pnpm prisma:migrate:dev    # 本地开发：根据 schema 变化创建并应用 migration
+```
+
+### 5. 启动开发服务器
+
+```bash
+pnpm start:dev
+```
+
+验证：
+
+```bash
+curl http://localhost:3000/        # { "code": 0, "message": "success", "data": { "name": "home-exchange-server", "status": "ok" } }
+curl http://localhost:3000/health  # Terminus 健康检查，包含数据库连通性
+open  http://localhost:3000/docs   # Swagger UI（开发期接口浏览，非正式契约）
+```
+
+### 常用脚本
+
+| 脚本 | 说明 |
+|---|---|
+| `pnpm start:dev` | 开发模式启动（watch） |
+| `pnpm build` | 编译到 `dist/` |
+| `pnpm test` | 单元测试（Vitest） |
+| `pnpm test:e2e` | e2e 测试（需要可用的 MySQL） |
+| `pnpm lint` | oxlint 静态检查 |
+| `pnpm format` | Prettier 格式化 |
+| `pnpm prisma:generate` | 生成 Prisma Client |
+| `pnpm prisma:migrate:dev` | 本地创建/应用 migration |
+| `pnpm prisma:migrate:deploy` | 生产/CI 应用已有 migration（不生成新 migration） |
+| `pnpm prisma:studio` | 打开 Prisma Studio 查看数据 |
+| `pnpm db:up` / `pnpm db:down` | 启停 docker-compose 本地 MySQL（可选方式） |
+
 ## API 文档
 
 API 总文档与详细文档维护在：
@@ -53,12 +152,4 @@ docs/api.md
 docs/api/
 ```
 
-它们是后端 API 已实现/已交付契约的 Source of Truth，前端仓库应以其完成 API 对接。
-
-## 技术栈
-
-> TODO：补充具体技术栈（运行时、框架、ORM、部署方式等）。
-
-## 本地开发
-
-> TODO：补充环境变量配置、启动命令、测试命令等。
+它们是后端 API 已实现/已交付契约的 **Source of Truth**，`home-exchange-admin`、`home-exchange-uniapp` 应以其完成 API 对接；`/docs`（Swagger）仅供开发期调试探索，不能替代上述文档（见 `.cursor/rules/backend.md` 第 43 节）。

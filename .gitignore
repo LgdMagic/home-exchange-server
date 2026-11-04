@@ -157,3 +157,9 @@ vite.config.ts.timestamp-*
 
 # Build output (generic)
 build/
+
+# Prisma generated client (regenerate via `pnpm prisma:generate`)
+src/generated/
+
+
+/generated/prisma
