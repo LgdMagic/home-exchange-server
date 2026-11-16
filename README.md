@@ -49,7 +49,7 @@ Backend Agent 的详细职责与规则见 [`.cursor/rules/backend.md`](.cursor/r
 - 运行时：Node.js 22+（ESM / NodeNext）
 - 框架：[NestJS](https://nestjs.com/)（Controller / Service / Repository 分层）
 - 语言：TypeScript（strict）
-- 数据库：MySQL，ORM 为 [Prisma](https://www.prisma.io/)（v7，通过 `@prisma/adapter-mariadb` 驱动适配器连接 MySQL/MariaDB）
+- 数据库：PostgreSQL，ORM 为 [Prisma](https://www.prisma.io/)（v7，通过 `@prisma/adapter-pg` 驱动适配器连接）
 - 校验：class-validator / class-transformer（全局 `ValidationPipe`）
 - 认证基础库：`@nestjs/jwt` + `passport-jwt`（具体登录/鉴权业务逻辑待对应 OpenSpec Change 落地）
 - 日志：`nestjs-pino`（结构化日志）
@@ -69,30 +69,27 @@ Backend Agent 的详细职责与规则见 [`.cursor/rules/backend.md`](.cursor/r
 pnpm install
 ```
 
-### 2. 准备 MySQL
+### 2. 准备 PostgreSQL
 
 二选一：
 
-**方式 A：使用本机已安装的 MySQL**（当前本地开发默认方式）
+**方式 A：使用本机已安装的 PostgreSQL**（当前本地开发默认方式，例如通过 [Postgres.app](https://postgresapp.com/) 或 Homebrew 安装）
 
-确保存在以下数据库与账号（utf8mb4）：
+确保存在以下数据库与账号：
 
 ```sql
-CREATE DATABASE IF NOT EXISTS home_exchange CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER IF NOT EXISTS 'home_exchange'@'localhost' IDENTIFIED BY 'home_exchange';
-CREATE USER IF NOT EXISTS 'home_exchange'@'127.0.0.1' IDENTIFIED BY 'home_exchange';
-GRANT ALL PRIVILEGES ON home_exchange.* TO 'home_exchange'@'localhost';
-GRANT ALL PRIVILEGES ON home_exchange.* TO 'home_exchange'@'127.0.0.1';
--- Prisma `migrate dev` 需要创建 shadow database，本地开发环境建议直接授予全局权限：
-GRANT ALL PRIVILEGES ON *.* TO 'home_exchange'@'localhost';
-GRANT ALL PRIVILEGES ON *.* TO 'home_exchange'@'127.0.0.1';
-FLUSH PRIVILEGES;
+CREATE DATABASE home_exchange;
+CREATE USER home_exchange WITH PASSWORD 'home_exchange';
+GRANT ALL PRIVILEGES ON DATABASE home_exchange TO home_exchange;
+-- PostgreSQL 15+ 需要额外授予 schema 权限：
+\c home_exchange
+GRANT ALL ON SCHEMA public TO home_exchange;
 ```
 
-**方式 B：使用 Docker Compose**（适合没有本机 MySQL、或想要一个干净可复现环境的情况）
+**方式 B：使用 Docker Compose**（适合没有本机 PostgreSQL、或想要一个干净可复现环境的情况）
 
 ```bash
-pnpm db:up    # docker compose up -d mysql
+pnpm db:up    # docker compose up -d postgres
 # 用完后
 pnpm db:down  # docker compose down
 ```
@@ -110,7 +107,7 @@ cp .env.example .env
 
 ```bash
 pnpm prisma:generate       # 生成 Prisma Client 到 src/generated/prisma（已 gitignore，按需重新生成）
-pnpm prisma:migrate:dev    # 本地开发：根据 schema 变化创建并应用 migration
+pnpm prisma:migrate:dev    # 本地开发：根据 schema 变化创建并应用 migration（PostgreSQL 不需要 shadow database 的额外授权）
 ```
 
 ### 5. 启动开发服务器

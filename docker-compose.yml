@@ -1,28 +1,23 @@
 name: home-exchange-server
 
 services:
-  mysql:
-    image: mysql:8.4
+  postgres:
+    image: postgres:18
     restart: unless-stopped
     environment:
-      MYSQL_DATABASE: home_exchange
-      MYSQL_USER: home_exchange
-      MYSQL_PASSWORD: home_exchange
-      MYSQL_ROOT_PASSWORD: root
+      POSTGRES_DB: home_exchange
+      POSTGRES_USER: home_exchange
+      POSTGRES_PASSWORD: home_exchange
       TZ: UTC
     ports:
-      - '3306:3306'
+      - '5432:5432'
     volumes:
-      - mysql_data:/var/lib/mysql
-    command:
-      - --character-set-server=utf8mb4
-      - --collation-server=utf8mb4_unicode_ci
-      - --default-time-zone=+00:00
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost']
+      test: ['CMD-SHELL', 'pg_isready -U home_exchange -d home_exchange']
       interval: 5s
       timeout: 5s
       retries: 10
 
 volumes:
-  mysql_data:
+  postgres_data:

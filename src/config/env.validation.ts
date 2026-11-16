@@ -11,7 +11,7 @@ const envSchema = Joi.object({
   PORT: Joi.number().port().default(3000),
 
   DATABASE_URL: Joi.string()
-    .uri({ scheme: ['mysql'] })
+    .uri({ scheme: ['postgresql', 'postgres'] })
     .required(),
 
   JWT_SECRET: Joi.string().min(16).required(),

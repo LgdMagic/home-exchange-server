@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PrismaMariaDb } from '@prisma/adapter-mariadb';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../generated/prisma/client.js';
 
 /**
@@ -10,7 +10,7 @@ import { PrismaClient } from '../generated/prisma/client.js';
  * 访问数据库，而不是各自创建 PrismaClient 实例。
  *
  * Prisma 7 要求通过 Driver Adapter 连接数据库（不再从 schema 的
- * datasource url 隐式连接），MySQL/MariaDB 对应 `@prisma/adapter-mariadb`。
+ * datasource url 隐式连接），PostgreSQL 对应 `@prisma/adapter-pg`。
  */
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
@@ -18,13 +18,15 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
   constructor(configService: ConfigService) {
     super({
-      adapter: new PrismaMariaDb(configService.getOrThrow<string>('database.url')),
+      adapter: new PrismaPg({
+        connectionString: configService.getOrThrow<string>('database.url'),
+      }),
     });
   }
 
   async onModuleInit(): Promise<void> {
     await this.$connect();
-    this.logger.log('Prisma connected to MySQL');
+    this.logger.log('Prisma connected to PostgreSQL');
   }
 
   async onModuleDestroy(): Promise<void> {

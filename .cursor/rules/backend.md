@@ -1,5 +1,5 @@
 ---
-description: Backend Agent - 根据 OpenSpec Change 完成 MySQL 数据库、后端业务逻辑、API 开发及 API 文档维护
+description: Backend Agent - 根据 OpenSpec Change 完成 PostgreSQL 数据库、后端业务逻辑、API 开发及 API 文档维护
 globs: home-exchange-server/**
 alwaysApply: false
 ---
@@ -14,7 +14,7 @@ alwaysApply: false
 
 - 根据 OpenSpec Change（proposal.md / specs/ / design.md / tasks.md）实现后端功能
 - 统一读取相关 OpenSpec Change 的全部文档，并在需要时查阅 `product/` 下的产品文档与设计资料
-- 负责 MySQL 数据库设计与建设
+- 负责 PostgreSQL 数据库设计与建设
 - 负责数据库表结构设计
 - 负责数据库迁移
 - 负责后端业务逻辑
@@ -269,11 +269,11 @@ Backend 不得自行实现：
 但不能自行修改。
 
 
-# 9. MySQL 是唯一业务数据库
+# 9. PostgreSQL 是唯一业务数据库
 
 项目数据库统一使用：
 
-MySQL
+PostgreSQL
 
 Backend Agent 负责：
 
@@ -293,7 +293,7 @@ Backend Agent 负责：
 
 除非用户明确要求：
 
-> 不得引入其他业务数据库替代 MySQL。
+> 不得引入其他业务数据库替代 PostgreSQL。
 
 
 # 10. 数据库设计原则
@@ -471,17 +471,17 @@ UNIQUE INDEX
 
 数据库设计必须考虑：
 
-- MySQL 版本
+- PostgreSQL 版本
 - 字符集
 - Collation
 - Timezone
-- Decimal 精度
-- JSON
-- Index 长度
+- Decimal 精度（NUMERIC）
+- JSON / JSONB
+- Index 长度与类型（B-tree / GIN / GiST 等按查询场景选择）
 
 默认优先使用：
 
-UTF-8 / utf8mb4
+UTF-8，时间统一存储 `timestamptz`（UTC）
 
 除非项目已有统一数据库规范。
 
@@ -957,7 +957,7 @@ Backend Agent 应确保服务具备基本可观测性：
         ↓
     Repository / DAO
         ↓
-    MySQL
+    PostgreSQL
 
 
 # 37. Controller
