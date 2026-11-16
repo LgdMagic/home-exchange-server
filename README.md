@@ -75,6 +75,18 @@ pnpm install
 
 **方式 A：使用本机已安装的 PostgreSQL**（当前本地开发默认方式，例如通过 [Postgres.app](https://postgresapp.com/) 或 Homebrew 安装）
 
+> 当前本机是通过 Postgres.app 自带的二进制（未走 GUI）以独立数据目录启动的：
+>
+> ```bash
+> PGBIN=/Applications/Postgres.app/Contents/Versions/18/bin
+> PGDATA=/Users/macliu/postgres-data
+> "$PGBIN/pg_ctl" -D "$PGDATA" -l "$PGDATA/logfile" start   # 启动
+> "$PGBIN/pg_ctl" -D "$PGDATA" stop                          # 停止
+> "$PGBIN/pg_isready" -h 127.0.0.1 -p 5432                   # 检查是否就绪
+> ```
+>
+> 这个数据目录不在 Postgres.app GUI 的默认管理范围内，GUI 里不会显示/控制它；如果希望用 GUI 管理，需要改用 Postgres.app 默认的数据目录约定，或直接在 GUI 里新建一个 server。
+
 确保存在以下数据库与账号：
 
 ```sql
