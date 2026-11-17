@@ -21,6 +21,16 @@ const envSchema = Joi.object({
   LOG_LEVEL: Joi.string()
     .valid('fatal', 'error', 'warn', 'info', 'debug', 'trace')
     .default('info'),
+
+  // customer-phone-auth（OpenSpec Change: add-customer-phone-login）
+  AUTH_SMS_TEST_MODE: Joi.string().valid('true', 'false').default('true'),
+  WECHAT_MINI_APP_ID: Joi.string().allow('').default(''),
+  WECHAT_MINI_APP_SECRET: Joi.string().allow('').default(''),
+  TENCENT_SMS_SECRET_ID: Joi.string().allow('').default(''),
+  TENCENT_SMS_SECRET_KEY: Joi.string().allow('').default(''),
+  TENCENT_SMS_SDK_APP_ID: Joi.string().allow('').default(''),
+  TENCENT_SMS_SIGN_NAME: Joi.string().allow('').default(''),
+  TENCENT_SMS_TEMPLATE_ID: Joi.string().allow('').default(''),
 }).unknown(true);
 
 export function validateEnv(config: Record<string, unknown>): Record<string, unknown> {

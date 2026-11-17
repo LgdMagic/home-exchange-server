@@ -11,3 +11,49 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+/// customer-phone-auth（OpenSpec Change: add-customer-phone-login）
+enum AccountStatus {
+  ACTIVE
+  DISABLED
+}
+
+/// C 端用户账号，以「区号 + 手机号」作为唯一标识（登录即注册）。
+model Account {
+  id            String        @id @default(uuid())
+  countryCode   String        @map("country_code")
+  phoneNumber   String        @map("phone_number")
+  nickname      String?
+  avatarUrl     String?       @map("avatar_url")
+  status        AccountStatus @default(ACTIVE)
+  /// 首次登录同意《用户协议》《隐私政策》的时间，用于合规留痕
+  termsAgreedAt DateTime?     @map("terms_agreed_at")
+  /// 同意时对应的协议版本号
+  termsVersion  String?       @map("terms_version")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  @@unique([countryCode, phoneNumber], map: "uq_account_country_phone")
+  @@map("accounts")
+}
+
+/// 手机号短信验证码记录；频率限制（60s 冷却 / 1 小时 5 次）基于本表按时间窗口计数实现。
+model PhoneVerificationCode {
+  id            String    @id @default(uuid())
+  countryCode   String    @map("country_code")
+  phoneNumber   String    @map("phone_number")
+  /// 哈希存储，不落明文（即便测试期固定为 999999）
+  codeHash      String    @map("code_hash")
+  /// 发送时刻 + 5 分钟
+  expiresAt     DateTime  @map("expires_at")
+  /// 连续错误次数，达到 5 即失效
+  attemptCount  Int       @default(0) @map("attempt_count")
+  /// 校验成功后置位，不可再次使用
+  consumedAt    DateTime? @map("consumed_at")
+  /// 连续错误 5 次后置位
+  invalidatedAt DateTime? @map("invalidated_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@index([countryCode, phoneNumber, createdAt])
+  @@map("phone_verification_codes")
+}

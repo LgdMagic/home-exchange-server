@@ -61,6 +61,11 @@ Backend Agent 的详细职责与规则见 [`.cursor/rules/backend.md`](.cursor/r
 
 统一响应结构（Response Envelope）、业务错误码、全局异常过滤器已在 `src/common/` 下搭好基础设施，具体业务错误码由各 OpenSpec Change 实现时补充（见 `.cursor/rules/backend.md` 第 27-29 节）。
 
+### 已实现的业务能力
+
+- **`customer-phone-auth`**（OpenSpec Change: `add-customer-phone-login`）：C 端手机号登录/注册（微信一键获取手机号 + 手机号/验证码两种方式），详见 `docs/api/F001-customer-phone-login.md`。
+  - 需要额外的环境变量：`WECHAT_MINI_APP_ID` / `WECHAT_MINI_APP_SECRET`（微信小程序，AppSecret 严禁提交到 git）、`AUTH_SMS_TEST_MODE`（测试期固定验证码 `999999` 的开关，生产环境必须为 `false`）、`TENCENT_SMS_*` 系列（腾讯云国际短信，审批通过后启用，当前真实调用代码整体注释，见 `src/modules/sms/tencent-cloud-sms.sender.ts`）。
+
 ## 本地开发
 
 ### 1. 安装依赖
