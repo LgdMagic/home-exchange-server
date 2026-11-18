@@ -1,6 +1,15 @@
 export interface AppConfig {
   app: {
+    /** Node/框架层面的运行模式，只影响日志格式等纯技术优化，不代表"这是正式生产环境" */
     nodeEnv: string;
+    /**
+     * 这是不是真正的生产环境（development / test / staging / production）。
+     * 与 nodeEnv 分开：持续部署运行的环境（测试环境、预发环境）通常也会把 nodeEnv 设为
+     * "production" 以获得框架优化，但它们不是真正的生产环境——安全类检查（例如
+     * AUTH_SMS_TEST_MODE 是否允许开启）必须用 appEnv 判断，不能用 nodeEnv。
+     * 未显式设置时，默认与 nodeEnv 相同（兼容本地开发场景）。
+     */
+    appEnv: string;
     port: number;
   };
   database: {
@@ -36,6 +45,7 @@ export interface AppConfig {
 export default (): AppConfig => ({
   app: {
     nodeEnv: process.env.NODE_ENV ?? 'development',
+    appEnv: process.env.APP_ENV ?? process.env.NODE_ENV ?? 'development',
     port: parseInt(process.env.PORT ?? '3000', 10),
   },
   database: {

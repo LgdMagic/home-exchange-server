@@ -14,16 +14,16 @@ describe('smsSenderProvider', () => {
   // 这里只用它的 useFactory 字段，因此需要断言其具体形态。
   const factory = (smsSenderProvider as { useFactory: (...args: never[]) => unknown }).useFactory;
 
-  it('throws when running in production with AUTH_SMS_TEST_MODE enabled', () => {
-    const configService = createConfigServiceMock({ 'app.nodeEnv': 'production', 'auth.smsTestMode': true });
+  it('throws when APP_ENV=production with AUTH_SMS_TEST_MODE enabled', () => {
+    const configService = createConfigServiceMock({ 'app.appEnv': 'production', 'auth.smsTestMode': true });
     const fixedSender = new FixedTestCodeSmsSender();
     const tencentSender = new TencentCloudInternationalSmsSender(configService);
 
     expect(() => factory(configService, fixedSender, tencentSender)).toThrow(/AUTH_SMS_TEST_MODE/);
   });
 
-  it('returns the fixed test sender when test mode is enabled outside production', () => {
-    const configService = createConfigServiceMock({ 'app.nodeEnv': 'development', 'auth.smsTestMode': true });
+  it('returns the fixed test sender when test mode is enabled outside production, even if NODE_ENV=production (e.g. a deployed test/staging environment)', () => {
+    const configService = createConfigServiceMock({ 'app.appEnv': 'test', 'auth.smsTestMode': true });
     const fixedSender = new FixedTestCodeSmsSender();
     const tencentSender = new TencentCloudInternationalSmsSender(configService);
 
@@ -31,7 +31,7 @@ describe('smsSenderProvider', () => {
   });
 
   it('returns the Tencent Cloud sender when test mode is disabled', () => {
-    const configService = createConfigServiceMock({ 'app.nodeEnv': 'production', 'auth.smsTestMode': false });
+    const configService = createConfigServiceMock({ 'app.appEnv': 'production', 'auth.smsTestMode': false });
     const fixedSender = new FixedTestCodeSmsSender();
     const tencentSender = new TencentCloudInternationalSmsSender(configService);
 

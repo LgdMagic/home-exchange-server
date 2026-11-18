@@ -1,0 +1,36 @@
+name: home-exchange-server
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - '3000:3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-home_exchange}
+      POSTGRES_USER: ${POSTGRES_USER:-home_exchange}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-home_exchange}
+      TZ: UTC
+    # 刻意不对外暴露端口：app 通过 Docker 内部网络用服务名 `postgres` 连接，
+    # 数据库不应直接暴露给公网（见 .env.example 里 DATABASE_URL 的 host 写法）。
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-home_exchange}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:

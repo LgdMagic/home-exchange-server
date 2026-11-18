@@ -8,6 +8,9 @@ import Joi from 'joi';
  */
 const envSchema = Joi.object({
   NODE_ENV: Joi.string().valid('development', 'test', 'production').default('development'),
+  // 未显式设置时在 configuration.ts 里回退到 NODE_ENV，这里允许留空；
+  // 与 NODE_ENV 分开校验，见 configuration.ts 中 app.appEnv 的说明。
+  APP_ENV: Joi.string().valid('development', 'test', 'staging', 'production').optional(),
   PORT: Joi.number().port().default(3000),
 
   DATABASE_URL: Joi.string()
