@@ -31,6 +31,9 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+      # 给首次 initdb 留出宽限期：低配服务器上首次启动可能比健康检查默认窗口更久，
+      # 在 start_period 内的失败不计入 retries，避免"还没初始化完就被判定不健康"。
+      start_period: 40s
 
 volumes:
   postgres_data:
