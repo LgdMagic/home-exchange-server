@@ -24,8 +24,11 @@ services:
       TZ: UTC
     # 刻意不对外暴露端口：app 通过 Docker 内部网络用服务名 `postgres` 连接，
     # 数据库不应直接暴露给公网（见 .env.example 里 DATABASE_URL 的 host 写法）。
+    # PostgreSQL 18+ 官方镜像改了数据目录约定：挂载整个 /var/lib/postgresql（而不是
+    # 旧版的 /var/lib/postgresql/data），镜像内部会自动按版本号分子目录存放数据，
+    # 便于以后走 pg_upgrade 升级大版本。挂错路径会导致数据库没有真正初始化。
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-home_exchange}']
       interval: 5s
