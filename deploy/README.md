@@ -67,6 +67,7 @@ vim deploy/.env   # 填入真实值
 
 - `POSTGRES_PASSWORD` / `DATABASE_URL` 中的密码：换成强随机密码
 - `JWT_SECRET`：换成一个新的、足够长的随机字符串（不要和本地开发用的一样）
+- `PII_ENCRYPTION_KEY`：换成一个新的 32 字节 base64 密钥（生成方式见 `.env.example` 注释），不要和本地开发用的一样；**一旦投入使用后不要随意更换**（已加密的身份证号等数据会变得无法解密）
 - `WECHAT_MINI_APP_ID` / `WECHAT_MINI_APP_SECRET`
 
 短信这块**当前阶段不用管**：腾讯云短信资质还在单独推进，测试环境先维持 `AUTH_SMS_TEST_MODE=true`（固定验证码 999999），等审批/配置好了再切换成 `false` 并填真实凭证——不需要改代码，只改这个 `.env`。
@@ -102,9 +103,117 @@ curl http://127.0.0.1:3000/health
 1. **去腾讯云控制台把端口开放**：云服务器 → 安全组 → 添加规则，放行 TCP 3000（或者你打算用的端口/80/443）。这一步只能在腾讯云控制台操作，Docker 跑起来了但外部访问不了，十有八九是卡在这一步。
 2. 用 `http://<服务器公网IP>:3000/health` 测试。
 
-## 6.（可选）绑定域名 + HTTPS
+## 6. 绑定域名 + HTTPS
 
-当前应用直接监听 3000 端口。如果想用你已经备案好的域名正常访问（`https://test.yourdomain.com`），建议加一层 Nginx 反向代理 + Let's Encrypt 证书，而不是让 Node 应用自己处理 TLS。这部分需要你提供域名/子域名之后再补充具体配置，先跳过。
+当前应用直接监听 3000 端口。用 Nginx 反向代理 + Let's Encrypt 证书来对外提供 HTTPS，Node 应用自己不处理 TLS。
+
+以测试子域名 `apitest.wandercat.cn`、服务器公网 IP `139.199.199.61` 为例（已确认 `curl http://139.199.199.61:3000/health` 可通）。
+
+### 6.1 确认域名解析
+
+去你的 DNS 服务商（腾讯云 DNSPod 等）给 `apitest.wandercat.cn` 加一条 **A 记录**，指向 `139.199.199.61`，然后验证：
+
+```bash
+dig +short apitest.wandercat.cn
+# 应该输出 139.199.199.61
+```
+
+没生效就等解析传播（通常几分钟），生效之前后面的 `certbot` 签发会失败。
+
+### 6.2 安全组放行 80/443
+
+腾讯云控制台 → 云服务器 → 安全组 → 添加规则，放行 TCP **80**（HTTP，证书签发用）和 **443**（HTTPS）。这一步漏了的话 certbot 验证域名所有权会失败。
+
+### 6.3 在宿主机安装 Nginx（不是放进 Docker）
+
+Nginx 和 certbot 装在宿主机上，直接反代到本机的 `3000` 端口（docker-compose 已经把容器的 3000 映射到宿主机）。
+
+**Ubuntu/Debian：**
+
+```bash
+sudo apt update
+sudo apt install -y nginx
+```
+
+**TencentOS/CentOS：**
+
+```bash
+sudo yum install -y nginx
+sudo systemctl enable --now nginx
+```
+
+### 6.4 配置反向代理（先只开 80，给 certbot 用）
+
+创建配置文件 `/etc/nginx/conf.d/apitest.wandercat.cn.conf`：
+
+```nginx
+server {
+    listen 80;
+    server_name apitest.wandercat.cn;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+```
+
+检查语法并重载：
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+此时应该已经能用 `http://apitest.wandercat.cn/health` 访问到（走的是 80 端口反代，还没有 HTTPS）。
+
+### 6.5 用 certbot 申请 Let's Encrypt 证书
+
+**Ubuntu/Debian：**
+
+```bash
+sudo apt install -y certbot python3-certbot-nginx
+```
+
+**TencentOS/CentOS：**
+
+```bash
+sudo yum install -y certbot python3-certbot-nginx
+```
+
+签发证书并自动改写上面的 Nginx 配置（加 443 server block + 把 80 的流量重定向到 443）：
+
+```bash
+sudo certbot --nginx -d apitest.wandercat.cn
+```
+
+过程中会让你输入一个邮箱（用于证书到期提醒）、同意条款；如果问 "Redirect HTTP to HTTPS" 选 **2（Redirect）**。
+
+### 6.6 验证
+
+```bash
+curl https://apitest.wandercat.cn/health
+curl -I http://apitest.wandercat.cn/health   # 应该是 301/302 跳到 https
+```
+
+### 6.7 证书自动续期
+
+certbot 安装时通常会自带一个 systemd timer（或 cron）定期续期，确认一下：
+
+```bash
+systemctl list-timers | grep certbot
+sudo certbot renew --dry-run   # 模拟一次续期，确认流程没问题
+```
+
+Let's Encrypt 证书有效期 90 天，`certbot renew` 只会在快到期（默认剩 30 天内）时才真正续，所以这个 timer 平时跑着就行，不用手动管。
+
+> 之后如果要从外部访问，优先用 `https://apitest.wandercat.cn/...`；直接访问 `http://139.199.199.61:3000` 仍然可用（3000 端口还开着），但不走 TLS，正式联调/前端对接建议统一用域名+HTTPS。
 
 ## 7. 常用命令
 

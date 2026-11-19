@@ -34,6 +34,9 @@ const envSchema = Joi.object({
   TENCENT_SMS_SDK_APP_ID: Joi.string().allow('').default(''),
   TENCENT_SMS_SIGN_NAME: Joi.string().allow('').default(''),
   TENCENT_SMS_TEMPLATE_ID: Joi.string().allow('').default(''),
+
+  // customer-profile（OpenSpec Change: add-customer-profile-setup）
+  PII_ENCRYPTION_KEY: Joi.string().base64().required(),
 }).unknown(true);
 
 export function validateEnv(config: Record<string, unknown>): Record<string, unknown> {

@@ -33,8 +33,95 @@ model Account {
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
 
+  realNameVerification AccountRealNameVerification?
+  profile              CustomerProfile?
+
   @@unique([countryCode, phoneNumber], map: "uq_account_country_phone")
   @@map("accounts")
+}
+
+/// customer-profile（OpenSpec Change: add-customer-profile-setup）
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum ProfileSetupStep {
+  BASIC_INFO
+  LIFESTYLE
+  ACCOMMODATION_TRAVEL
+  COMPLETED
+}
+
+/// 实名认证过渡占位表（见 design.md「add-customer-profile-setup」Decisions 第 1 条）。
+/// 真正的实名认证能力上线后，这张表预期被该能力接管/扩展；customer-profile 不直接
+/// 依赖其内部实现方式，只依赖"是否存在一条该账号的记录"及 realName/birthDate 两个字段。
+model AccountRealNameVerification {
+  id        String @id @default(uuid())
+  accountId String @unique @map("account_id")
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  realName String @map("real_name")
+  /// AES-256-GCM 加密后的身份证号密文（IV+authTag+ciphertext，base64），绝不存明文
+  idCardNumberEncrypted String @map("id_card_number_encrypted")
+  /// 从身份证号第 7-14 位解析得出，未加密存储，供资料展示直接读取
+  birthDate DateTime @map("birth_date")
+  /// SELF_REPORTED（本次占位）| ID_CARD_OCR 等（真实实名认证能力接入后使用）
+  source     String    @map("source")
+  verifiedAt DateTime? @map("verified_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  @@map("account_real_name_verifications")
+}
+
+/// C 端用户个人资料（基础信息 + 生活方式 + 住宿偏好 + 旅行风格 + 步骤进度）。
+/// 真实姓名/出生日期不在本表，见 AccountRealNameVerification。
+model CustomerProfile {
+  id        String @id @default(uuid())
+  accountId String @unique @map("account_id")
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  // --- 基础信息 ---
+  gender     Gender?
+  /// 国内城市名称/code，或固定 sentinel "OTHER"；具体城市清单由前端维护，后端不做穷举校验
+  city       String?
+  occupation String?
+  bio        String? @db.VarChar(500)
+
+  // --- 我的生活方式（单选项存字符串，校验在应用层做，便于以后调整文案不需要迁移） ---
+  sleepSchedule        String?  @map("sleep_schedule")
+  atmospherePreference String?  @map("atmosphere_preference")
+  drinking             String?
+  smoking              String?
+  hasPets              String?  @map("has_pets")
+  petAttitude          String?  @map("pet_attitude")
+  lifestyleTidiness    String?  @map("lifestyle_tidiness")
+  interests            String[] @default([])
+
+  // --- 住宿偏好（均多选，Postgres 原生数组） ---
+  homeTypes     String[] @default([]) @map("home_types")
+  spaceFeatures String[] @default([]) @map("space_features")
+  livingNeeds   String[] @default([]) @map("living_needs")
+
+  // --- 旅行风格 ---
+  travelCompanions      String[] @default([]) @map("travel_companions")
+  travelStyles          String[] @default([]) @map("travel_styles")
+  cityExplorationStyles String[] @default([]) @map("city_exploration_styles")
+  travelFrequency       String?  @map("travel_frequency")
+  languages             String[] @default([])
+
+  // --- 步骤进度与完成状态 ---
+  currentStep                    ProfileSetupStep @default(BASIC_INFO) @map("current_step")
+  basicInfoCompletedAt           DateTime?        @map("basic_info_completed_at")
+  lifestyleCompletedAt           DateTime?        @map("lifestyle_completed_at")
+  accommodationTravelCompletedAt DateTime?        @map("accommodation_travel_completed_at")
+  profileCompletedAt             DateTime?        @map("profile_completed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("customer_profiles")
 }
 
 /// 手机号短信验证码记录；频率限制（60s 冷却 / 1 小时 5 次）基于本表按时间窗口计数实现。

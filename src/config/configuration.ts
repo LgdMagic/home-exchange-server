@@ -40,6 +40,10 @@ export interface AppConfig {
       templateId: string;
     };
   };
+  security: {
+    /** 32 字节 base64 密钥，用于加密身份证号等敏感个人信息（customer-profile） */
+    piiEncryptionKey: string;
+  };
 }
 
 export default (): AppConfig => ({
@@ -74,5 +78,8 @@ export default (): AppConfig => ({
       signName: process.env.TENCENT_SMS_SIGN_NAME ?? '',
       templateId: process.env.TENCENT_SMS_TEMPLATE_ID ?? '',
     },
+  },
+  security: {
+    piiEncryptionKey: process.env.PII_ENCRYPTION_KEY ?? '',
   },
 });
