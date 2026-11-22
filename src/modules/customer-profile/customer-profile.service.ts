@@ -1,5 +1,8 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { ProfileSetupStep } from '../../generated/prisma/enums.js';
+import {
+  ProfileSetupStep,
+  type RealNameVerificationStatus,
+} from '../../generated/prisma/enums.js';
 import { BusinessException } from '../../common/exceptions/business.exception.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { ProfileErrorCode } from './constants/profile-error-code.js';
@@ -7,10 +10,12 @@ import type { UpdateAccommodationTravelDto } from './dto/update-accommodation-tr
 import type { UpdateBasicInfoDto } from './dto/update-basic-info.dto.js';
 import type { UpdateLifestyleDto } from './dto/update-lifestyle.dto.js';
 import { maskPhoneNumber, maskRealName } from './mask.util.js';
+import { LivingDaysService } from '../living-days/living-days.service.js';
 import { RealNameVerificationService } from './real-name-verification.service.js';
 
 export interface ProfileView {
-  realNameVerified: boolean;
+  /** null 表示尚未提交；PENDING 表示已提交、待核验。不能据此展示「已实名认证」。 */
+  realNameStatus: RealNameVerificationStatus | null;
   realName: string | null;
   birthDate: Date | null;
   phoneNumber: string | null;
@@ -48,6 +53,7 @@ export class CustomerProfileService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly realNameVerificationService: RealNameVerificationService,
+    private readonly livingDaysService: LivingDaysService,
   ) {}
 
   async getProfileView(accountId: string): Promise<ProfileView> {
@@ -61,10 +67,12 @@ export class CustomerProfileService {
     ]);
 
     return {
-      realNameVerified: realNameInfo !== null,
+      realNameStatus: realNameInfo?.status ?? null,
       realName: realNameInfo ? maskRealName(realNameInfo.realName) : null,
       birthDate: realNameInfo?.birthDate ?? null,
-      phoneNumber: account.phoneNumber ? maskPhoneNumber(account.phoneNumber) : null,
+      phoneNumber: account.phoneNumber
+        ? maskPhoneNumber(account.phoneNumber)
+        : null,
       nickname: account.nickname,
       avatarUrl: account.avatarUrl,
       gender: profile.gender,
@@ -95,9 +103,11 @@ export class CustomerProfileService {
     };
   }
 
-  async updateBasicInfo(accountId: string, dto: UpdateBasicInfoDto): Promise<void> {
-    // 进入资料编辑的前提：实名信息（占位版）已提交，见 spec.md「实名认证完成后触发个人资料编辑」
-    await this.realNameVerificationService.assertVerified(accountId);
+  async updateBasicInfo(
+    accountId: string,
+    dto: UpdateBasicInfoDto,
+  ): Promise<void> {
+    await this.realNameVerificationService.assertSubmitted(accountId);
     await this.getOrCreateProfile(accountId);
 
     await this.prisma.customerProfile.update({
@@ -113,7 +123,10 @@ export class CustomerProfileService {
     });
   }
 
-  async updateLifestyle(accountId: string, dto: UpdateLifestyleDto): Promise<void> {
+  async updateLifestyle(
+    accountId: string,
+    dto: UpdateLifestyleDto,
+  ): Promise<void> {
     const profile = await this.getOrCreateProfile(accountId);
     this.assertStepCompleted(profile.basicInfoCompletedAt, '基础信息');
 
@@ -134,7 +147,10 @@ export class CustomerProfileService {
     });
   }
 
-  async updateAccommodationTravel(accountId: string, dto: UpdateAccommodationTravelDto): Promise<void> {
+  async updateAccommodationTravel(
+    accountId: string,
+    dto: UpdateAccommodationTravelDto,
+  ): Promise<void> {
     const profile = await this.getOrCreateProfile(accountId);
     this.assertStepCompleted(profile.lifestyleCompletedAt, '我的生活方式');
 
@@ -156,19 +172,27 @@ export class CustomerProfileService {
 
   async complete(accountId: string): Promise<void> {
     const profile = await this.getOrCreateProfile(accountId);
-    this.assertStepCompleted(profile.accommodationTravelCompletedAt, '住宿偏好与旅行风格');
+    this.assertStepCompleted(
+      profile.accommodationTravelCompletedAt,
+      '住宿偏好与旅行风格',
+    );
 
-    await this.prisma.customerProfile.update({
-      where: { accountId },
-      data: {
-        profileCompletedAt: new Date(),
-        currentStep: ProfileSetupStep.COMPLETED,
-      },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.customerProfile.update({
+        where: { accountId },
+        data: {
+          profileCompletedAt: new Date(),
+          currentStep: ProfileSetupStep.COMPLETED,
+        },
+      });
+      await this.livingDaysService.grantIfEligible(accountId, tx);
     });
   }
 
   private async getOrCreateProfile(accountId: string) {
-    const existing = await this.prisma.customerProfile.findUnique({ where: { accountId } });
+    const existing = await this.prisma.customerProfile.findUnique({
+      where: { accountId },
+    });
     if (existing) {
       return existing;
     }
@@ -176,7 +200,10 @@ export class CustomerProfileService {
     return this.prisma.customerProfile.create({ data: { accountId } });
   }
 
-  private assertStepCompleted(completedAt: Date | null, stepLabel: string): void {
+  private assertStepCompleted(
+    completedAt: Date | null,
+    stepLabel: string,
+  ): void {
     if (!completedAt) {
       throw new BusinessException(
         ProfileErrorCode.PROFILE_STEP_OUT_OF_ORDER,

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
+import { LivingDaysModule } from '../living-days/living-days.module.js';
 import { SmsModule } from '../sms/sms.module.js';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
@@ -13,6 +14,7 @@ import { WechatPhoneService } from './wechat-phone.service.js';
 @Module({
   imports: [
     SmsModule,
+    LivingDaysModule,
     PassportModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
@@ -22,6 +24,12 @@ import { WechatPhoneService } from './wechat-phone.service.js';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, VerificationCodeService, WechatPhoneService, TokenService, JwtStrategy],
+  providers: [
+    AuthService,
+    VerificationCodeService,
+    WechatPhoneService,
+    TokenService,
+    JwtStrategy,
+  ],
 })
 export class AuthModule {}

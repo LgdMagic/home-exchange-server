@@ -1,7 +1,15 @@
-import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import {
+  ArgumentsHost,
+  Catch,
+  ExceptionFilter,
+  HttpException,
+  HttpStatus,
+  Logger,
+} from '@nestjs/common';
 import type { Response } from 'express';
 import { CommonErrorCode } from '../constants/error-code.js';
 import { BusinessException } from '../exceptions/business.exception.js';
+import { ProfileErrorCode } from '../../modules/customer-profile/constants/profile-error-code.js';
 
 interface ResolvedError {
   httpStatus: number;
@@ -25,7 +33,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<{ url?: string; method?: string }>();
 
-    const resolved = this.resolve(exception);
+    const resolved = this.resolve(exception, request.url ?? '');
 
     if (resolved.httpStatus >= HttpStatus.INTERNAL_SERVER_ERROR) {
       this.logger.error(
@@ -41,12 +49,24 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     });
   }
 
-  private resolve(exception: unknown): ResolvedError {
+  private resolve(exception: unknown, requestUrl: string): ResolvedError {
     if (exception instanceof BusinessException) {
       return {
         httpStatus: exception.getStatus(),
         code: exception.code,
         message: exception.message,
+      };
+    }
+
+    if (
+      exception instanceof HttpException &&
+      exception.getStatus() === HttpStatus.PAYLOAD_TOO_LARGE &&
+      requestUrl.includes('/customer/real-name-verification/id-card-photo')
+    ) {
+      return {
+        httpStatus: HttpStatus.PAYLOAD_TOO_LARGE,
+        code: ProfileErrorCode.ID_CARD_PHOTO_INVALID,
+        message: '证件照片需为 5MB 以内的 JPG 或 PNG',
       };
     }
 
@@ -56,7 +76,8 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       const rawMessage =
         typeof body === 'string'
           ? body
-          : ((body as { message?: string | string[] }).message ?? exception.message);
+          : ((body as { message?: string | string[] }).message ??
+            exception.message);
 
       return {
         httpStatus,

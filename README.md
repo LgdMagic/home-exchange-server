@@ -67,8 +67,9 @@ Backend Agent 的详细职责与规则见 [`.cursor/rules/backend.md`](.cursor/r
   - 需要额外的环境变量：`WECHAT_MINI_APP_ID` / `WECHAT_MINI_APP_SECRET`（微信小程序，AppSecret 严禁提交到 git）、`AUTH_SMS_TEST_MODE`（测试期固定验证码 `999999` 的开关，生产环境必须为 `false`）、`TENCENT_SMS_*` 系列（腾讯云国际短信，审批通过后启用，当前真实调用代码整体注释，见 `src/modules/sms/tencent-cloud-sms.sender.ts`）。
   - 同时建立了项目首套登录态校验基础设施（`JwtAuthGuard` + `@CurrentAccountId()`），供后续所有需要登录的能力复用。
 - **`customer-profile`**（OpenSpec Change: `add-customer-profile-setup`）：C 端个人资料编辑（基础信息/生活方式/住宿偏好/旅行风格三步 + 预览确认），详见 `docs/api/F002-customer-profile-setup.md`。
-  - 实名认证当前是**用户自报占位方案**（姓名 + 身份证号，仅格式校验，未经真实核验），身份证号加密存储。
-  - 需要额外的环境变量：`PII_ENCRYPTION_KEY`（敏感个人信息加密密钥，32 字节 base64，每个环境必须不同，一旦使用不可更换）。
+- **`customer-real-name-verification`**（OpenSpec Change: `add-customer-real-name-verification`）：提交姓名、大陆身份证号，以及身份证人像面和国徽面。状态为待核验，提交后锁定，同一身份证号只能绑定一个账号。照片加密存在本地，接口不返回照片。详见 `docs/api/F003-customer-real-name-verification.md`。
+  - 需要额外的环境变量：`PII_ENCRYPTION_KEY`（敏感个人信息加密密钥，32 字节 base64，同时用于 AES-256-GCM 和身份证号 HMAC，每个环境必须不同，一旦使用不可更换）。证件照片目录可用 `ID_CARD_PHOTO_DIR`，不配置时是 `storage/id-card-photos`。
+- **`living-days`**（OpenSpec Change: `add-living-days`）：Living Days 余额与首次交换权益包分开记账。一笔订单只能选用其中一样。会员只能查询，不能给自己加天数。详见 `docs/api/F004-living-days.md`。
 
 ## 本地开发
 
@@ -147,19 +148,19 @@ open  http://localhost:3000/docs   # Swagger UI（开发期接口浏览，非正
 
 ### 常用脚本
 
-| 脚本 | 说明 |
-|---|---|
-| `pnpm start:dev` | 开发模式启动（watch） |
-| `pnpm build` | 编译到 `dist/` |
-| `pnpm test` | 单元测试（Vitest） |
-| `pnpm test:e2e` | e2e 测试（需要可用的 MySQL） |
-| `pnpm lint` | oxlint 静态检查 |
-| `pnpm format` | Prettier 格式化 |
-| `pnpm prisma:generate` | 生成 Prisma Client |
-| `pnpm prisma:migrate:dev` | 本地创建/应用 migration |
-| `pnpm prisma:migrate:deploy` | 生产/CI 应用已有 migration（不生成新 migration） |
-| `pnpm prisma:studio` | 打开 Prisma Studio 查看数据 |
-| `pnpm db:up` / `pnpm db:down` | 启停 docker-compose 本地 MySQL（可选方式） |
+| 脚本                          | 说明                                             |
+| ----------------------------- | ------------------------------------------------ |
+| `pnpm start:dev`              | 开发模式启动（watch）                            |
+| `pnpm build`                  | 编译到 `dist/`                                   |
+| `pnpm test`                   | 单元测试（Vitest）                               |
+| `pnpm test:e2e`               | e2e 测试（需要可用的 MySQL）                     |
+| `pnpm lint`                   | oxlint 静态检查                                  |
+| `pnpm format`                 | Prettier 格式化                                  |
+| `pnpm prisma:generate`        | 生成 Prisma Client                               |
+| `pnpm prisma:migrate:dev`     | 本地创建/应用 migration                          |
+| `pnpm prisma:migrate:deploy`  | 生产/CI 应用已有 migration（不生成新 migration） |
+| `pnpm prisma:studio`          | 打开 Prisma Studio 查看数据                      |
+| `pnpm db:up` / `pnpm db:down` | 启停 docker-compose 本地 MySQL（可选方式）       |
 
 ## API 文档
 

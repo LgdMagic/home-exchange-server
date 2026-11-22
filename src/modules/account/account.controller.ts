@@ -13,13 +13,29 @@ import { UpdateWechatIdentityDto } from './dto/update-wechat-identity.dto.js';
 export class AccountController {
   constructor(private readonly accountService: AccountService) {}
 
-  // 微信小程序 wx.request 不支持 PATCH，同一处理函数同时开放 PUT。
+  // Nest 的方法装饰器会互相覆盖，不能写在同一个函数上。
+  // 微信小程序 wx.request 不支持 PATCH，所以 PUT 和 PATCH 各注册一条路由。
   @Patch('wechat-identity')
-  @Put('wechat-identity')
   @HttpCode(HttpStatus.OK)
-  async updateWechatIdentity(
+  updateWechatIdentityByPatch(
     @CurrentAccountId() accountId: string,
     @Body() dto: UpdateWechatIdentityDto,
+  ): Promise<{ success: true }> {
+    return this.updateWechatIdentity(accountId, dto);
+  }
+
+  @Put('wechat-identity')
+  @HttpCode(HttpStatus.OK)
+  updateWechatIdentityByPut(
+    @CurrentAccountId() accountId: string,
+    @Body() dto: UpdateWechatIdentityDto,
+  ): Promise<{ success: true }> {
+    return this.updateWechatIdentity(accountId, dto);
+  }
+
+  private async updateWechatIdentity(
+    accountId: string,
+    dto: UpdateWechatIdentityDto,
   ): Promise<{ success: true }> {
     await this.accountService.updateWechatIdentity(accountId, dto);
     return { success: true };

@@ -33,8 +33,14 @@ model Account {
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
 
-  realNameVerification AccountRealNameVerification?
-  profile              CustomerProfile?
+  realNameVerification    AccountRealNameVerification?
+  realNameIdCardPhotos    RealNameIdCardPhoto[]
+  profile                 CustomerProfile?
+  benefitPackages         BenefitPackage[]
+  livingDaysAccount       LivingDaysAccount?
+  livingDaysLedgerEntries LivingDaysLedgerEntry[]
+  exchangesAsGuest        LivingExchange[]             @relation("ExchangeGuest")
+  exchangesAsHost         LivingExchange[]             @relation("ExchangeHost")
 
   @@unique([countryCode, phoneNumber], map: "uq_account_country_phone")
   @@map("accounts")
@@ -53,33 +59,62 @@ enum ProfileSetupStep {
   COMPLETED
 }
 
-/// 实名认证过渡占位表（见 design.md「add-customer-profile-setup」Decisions 第 1 条）。
-/// 真正的实名认证能力上线后，这张表预期被该能力接管/扩展；customer-profile 不直接
-/// 依赖其内部实现方式，只依赖"是否存在一条该账号的记录"及 realName/birthDate 两个字段。
+/// 实名认证状态。本期只写入 PENDING（待核验），不表示已通过第三方核验。
+enum RealNameVerificationStatus {
+  PENDING
+}
+
+/// 账号实名信息（OpenSpec Change: add-customer-real-name-verification）。
+/// 一个账号一条记录，提交后锁定。身份证号密文带随机 IV，唯一性看 idCardNumberHash。
 model AccountRealNameVerification {
-  id        String @id @default(uuid())
-  accountId String @unique @map("account_id")
+  id        String  @id @default(uuid())
+  accountId String  @unique @map("account_id")
   account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
-  realName String @map("real_name")
+  realName              String                     @map("real_name")
   /// AES-256-GCM 加密后的身份证号密文（IV+authTag+ciphertext，base64），绝不存明文
-  idCardNumberEncrypted String @map("id_card_number_encrypted")
+  idCardNumberEncrypted String                     @map("id_card_number_encrypted")
+  /// 规范化身份证号的 HMAC-SHA256（十六进制）。同一号码密文不同，唯一约束落在这一列
+  idCardNumberHash      String                     @unique @map("id_card_number_hash")
   /// 从身份证号第 7-14 位解析得出，未加密存储，供资料展示直接读取
-  birthDate DateTime @map("birth_date")
-  /// SELF_REPORTED（本次占位）| ID_CARD_OCR 等（真实实名认证能力接入后使用）
-  source     String    @map("source")
-  verifiedAt DateTime? @map("verified_at")
-  createdAt  DateTime  @default(now()) @map("created_at")
-  updatedAt  DateTime  @updatedAt @map("updated_at")
+  birthDate             DateTime                   @map("birth_date")
+  status                RealNameVerificationStatus @default(PENDING)
+  /// SELF_REPORTED：用户自报，本期不做第三方核验
+  source                String                     @map("source")
+  /// 留给后续第三方核验写入。待核验记录保持为空，不能用它判断「已实名认证」
+  verifiedAt            DateTime?                  @map("verified_at")
+  createdAt             DateTime                   @default(now()) @map("created_at")
+  updatedAt             DateTime                   @updatedAt @map("updated_at")
 
   @@map("account_real_name_verifications")
+}
+
+/// 身份证正反面。提交实名之前可以更换；提交后随实名信息一起锁定。
+enum IdCardPhotoSide {
+  FRONT
+  BACK
+}
+
+model RealNameIdCardPhoto {
+  id          String          @id @default(uuid())
+  accountId   String          @map("account_id")
+  side        IdCardPhotoSide
+  contentType String          @map("content_type")
+  byteSize    Int             @map("byte_size")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, side])
+  @@map("real_name_id_card_photos")
 }
 
 /// C 端用户个人资料（基础信息 + 生活方式 + 住宿偏好 + 旅行风格 + 步骤进度）。
 /// 真实姓名/出生日期不在本表，见 AccountRealNameVerification。
 model CustomerProfile {
-  id        String @id @default(uuid())
-  accountId String @unique @map("account_id")
+  id        String  @id @default(uuid())
+  accountId String  @unique @map("account_id")
   account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
   // --- 基础信息 ---
@@ -122,6 +157,97 @@ model CustomerProfile {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("customer_profiles")
+}
+
+/// 首次交换权益包与 Living Days（OpenSpec Change: add-living-days）。
+/// 一笔订单只能选用权益包或 Living Days 其中一样。
+enum BenefitPackageCode {
+  FIRST_LIVING_EXCHANGE
+}
+
+enum BenefitPackageStatus {
+  AVAILABLE
+  USED
+}
+
+enum SettlementSource {
+  BENEFIT_PACKAGE
+  LIVING_DAYS
+}
+
+enum LivingExchangeStatus {
+  OPEN
+  REJECTED
+  CANCELLED
+  NOT_COMPLETED
+  COMPLETED
+}
+
+enum LivingDaysDirection {
+  EARNED
+  SPENT
+}
+
+/// 权益包。不存放天数，也不参与 Living Days 流水。没有这一行就是未发放。
+model BenefitPackage {
+  id        String               @id @default(uuid())
+  accountId String               @map("account_id")
+  code      BenefitPackageCode
+  status    BenefitPackageStatus @default(AVAILABLE)
+
+  account   Account          @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  exchanges LivingExchange[]
+
+  @@unique([accountId, code])
+  @@map("benefit_packages")
+}
+
+/// Living Days 余额。没有这一行时查询视为 0。
+model LivingDaysAccount {
+  accountId String @id @map("account_id")
+  balance   Int    @default(0)
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@map("living_days_accounts")
+}
+
+/// 一笔订单只有一个 settlementSource。
+model LivingExchange {
+  id               String               @id @default(uuid())
+  guestAccountId   String               @map("guest_account_id")
+  hostAccountId    String               @map("host_account_id")
+  selectedDays     Int                  @map("selected_days")
+  settlementSource SettlementSource     @map("settlement_source")
+  benefitPackageId String?              @map("benefit_package_id")
+  status           LivingExchangeStatus @default(OPEN)
+  actualDays       Int?                 @map("actual_days")
+  createdAt        DateTime             @default(now()) @map("created_at")
+  closedAt         DateTime?            @map("closed_at")
+
+  guestAccount   Account                 @relation("ExchangeGuest", fields: [guestAccountId], references: [id], onDelete: Cascade)
+  hostAccount    Account                 @relation("ExchangeHost", fields: [hostAccountId], references: [id], onDelete: Cascade)
+  benefitPackage BenefitPackage?         @relation(fields: [benefitPackageId], references: [id], onDelete: Cascade)
+  ledgerEntries  LivingDaysLedgerEntry[]
+
+  @@index([guestAccountId, status])
+  @@map("living_exchanges")
+}
+
+/// 只记录 Living Days 的增减。权益包订单不写客人的 SPENT。
+model LivingDaysLedgerEntry {
+  id         String              @id @default(uuid())
+  accountId  String              @map("account_id")
+  exchangeId String              @map("exchange_id")
+  direction  LivingDaysDirection
+  amount     Int
+  createdAt  DateTime            @default(now()) @map("created_at")
+
+  account  Account        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  exchange LivingExchange @relation(fields: [exchangeId], references: [id], onDelete: Cascade)
+
+  @@unique([exchangeId, accountId, direction])
+  @@map("living_days_ledger_entries")
 }
 
 /// 手机号短信验证码记录；频率限制（60s 冷却 / 1 小时 5 次）基于本表按时间窗口计数实现。

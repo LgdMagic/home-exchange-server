@@ -1,0 +1,18 @@
+{
+  "autoRun": {
+    "allow_instructions": [
+      "Routine Node.js/pnpm dev-loop commands are safe to run without extra scrutiny: pnpm install, pnpm build, pnpm lint, pnpm format, pnpm test and its variants (test:watch, test:cov, test:e2e), and pnpm exec prisma generate/validate/format.",
+      "Read-only git commands (status, diff, log, branch, show) and read-only database inspection queries (SELECT) are safe to run without extra scrutiny."
+    ],
+    "block_instructions": [
+      "Always require explicit human approval before running any command with sudo or that otherwise requests elevated/root privileges.",
+      "Always require explicit human approval before any destructive file deletion, such as rm -rf, deleting files outside this project directory, or recursively deleting directories.",
+      "Always require explicit human approval before git push (especially --force), git reset --hard, or any command that rewrites git history or force-overwrites a remote branch.",
+      "Always require explicit human approval before any Prisma migration command that can change or reset schema/data: prisma migrate dev, prisma migrate deploy, prisma migrate reset, prisma db push, or prisma db seed against any non-trivial dataset.",
+      "Always require explicit human approval before any SQL or database command that drops, truncates, or deletes data without a narrow WHERE clause (DROP DATABASE, DROP TABLE, TRUNCATE, DELETE FROM without WHERE), or that alters user/role privileges (CREATE USER, ALTER USER, GRANT, REVOKE).",
+      "Always require explicit human approval before installing or modifying system-wide/global packages or ownership (brew install, npm install -g, chown, chmod -R on paths outside this project, editing shell profile files like .zshrc/.bashrc).",
+      "Always require explicit human approval before stopping, restarting, or reinitializing the local PostgreSQL server (pg_ctl stop/restart/initdb) if it could affect already-running local data that has not been backed up.",
+      "Always require explicit human approval before creating, modifying, or deleting .env files, credentials, API keys, or secrets, or before changing pnpm/npm build-script approval settings (pnpm-workspace.yaml allowBuilds, pnpm approve-builds)."
+    ]
+  }
+}

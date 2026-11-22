@@ -10,6 +10,7 @@ import { HealthModule } from './health/health.module.js';
 import { AccountModule } from './modules/account/account.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { CustomerProfileModule } from './modules/customer-profile/customer-profile.module.js';
+import { LivingDaysModule } from './modules/living-days/living-days.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 
 @Module({
@@ -38,6 +39,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
     AuthModule,
     AccountModule,
     CustomerProfileModule,
+    LivingDaysModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,6 +1,11 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHmac,
+  randomBytes,
+} from 'node:crypto';
 
 const ALGORITHM = 'aes-256-gcm';
 const KEY_LENGTH_BYTES = 32;
@@ -21,13 +26,15 @@ export class PiiEncryptionService implements OnModuleInit {
   constructor(private readonly configService: ConfigService) {}
 
   onModuleInit(): void {
-    const keyBase64 = this.configService.getOrThrow<string>('security.piiEncryptionKey');
+    const keyBase64 = this.configService.getOrThrow<string>(
+      'security.piiEncryptionKey',
+    );
     const key = Buffer.from(keyBase64, 'base64');
 
     if (key.length !== KEY_LENGTH_BYTES) {
       throw new Error(
         `PII_ENCRYPTION_KEY must decode to exactly ${KEY_LENGTH_BYTES} bytes (got ${key.length}). ` +
-          'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'base64\'))"',
+          "Generate one with: node -e \"console.log(require('crypto').randomBytes(32).toString('base64'))\"",
       );
     }
 
@@ -35,23 +42,48 @@ export class PiiEncryptionService implements OnModuleInit {
   }
 
   encrypt(plaintext: string): string {
+    return this.encryptBuffer(Buffer.from(plaintext, 'utf8')).toString(
+      'base64',
+    );
+  }
+
+  /** 加密二进制（证件照片）。格式与 encrypt 相同：iv + authTag + ciphertext。 */
+  encryptBuffer(plaintext: Buffer): Buffer {
     const iv = randomBytes(IV_LENGTH_BYTES);
     const cipher = createCipheriv(ALGORITHM, this.key, iv);
-    const ciphertext = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+    const ciphertext = Buffer.concat([
+      cipher.update(plaintext),
+      cipher.final(),
+    ]);
     const authTag = cipher.getAuthTag();
 
-    return Buffer.concat([iv, authTag, ciphertext]).toString('base64');
+    return Buffer.concat([iv, authTag, ciphertext]);
+  }
+
+  /** 确定性 HMAC-SHA256，十六进制。用于身份证号唯一约束，不能用随机 IV 的密文做唯一索引。 */
+  hmacSha256(plaintext: string): string {
+    return createHmac('sha256', this.key)
+      .update(plaintext, 'utf8')
+      .digest('hex');
   }
 
   decrypt(encoded: string): string {
-    const raw = Buffer.from(encoded, 'base64');
-    const iv = raw.subarray(0, IV_LENGTH_BYTES);
-    const authTag = raw.subarray(IV_LENGTH_BYTES, IV_LENGTH_BYTES + AUTH_TAG_LENGTH_BYTES);
-    const ciphertext = raw.subarray(IV_LENGTH_BYTES + AUTH_TAG_LENGTH_BYTES);
+    return this.decryptBuffer(Buffer.from(encoded, 'base64')).toString('utf8');
+  }
+
+  decryptBuffer(payload: Buffer): Buffer {
+    const iv = payload.subarray(0, IV_LENGTH_BYTES);
+    const authTag = payload.subarray(
+      IV_LENGTH_BYTES,
+      IV_LENGTH_BYTES + AUTH_TAG_LENGTH_BYTES,
+    );
+    const ciphertext = payload.subarray(
+      IV_LENGTH_BYTES + AUTH_TAG_LENGTH_BYTES,
+    );
 
     const decipher = createDecipheriv(ALGORITHM, this.key, iv);
     decipher.setAuthTag(authTag);
 
-    return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
+    return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
   }
 }

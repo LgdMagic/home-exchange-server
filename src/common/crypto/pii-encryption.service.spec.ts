@@ -45,6 +45,17 @@ describe('PiiEncryptionService', () => {
     expect(() => service.decrypt(tampered)).toThrow();
   });
 
+  it('returns the same HMAC for the same plaintext and a different HMAC for another plaintext', () => {
+    const service = createService(validKey);
+
+    expect(service.hmacSha256('110101199003078515')).toBe(
+      service.hmacSha256('110101199003078515'),
+    );
+    expect(service.hmacSha256('110101199003078515')).not.toBe(
+      service.hmacSha256('440302198501011232'),
+    );
+  });
+
   it('throws at startup if the key does not decode to 32 bytes', () => {
     const shortKey = Buffer.from('too-short').toString('base64');
     expect(() => createService(shortKey)).toThrow(/32 bytes/);

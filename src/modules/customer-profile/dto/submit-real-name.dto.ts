@@ -1,12 +1,17 @@
+import { Transform } from 'class-transformer';
 import { IsNotEmpty, IsString, Length } from 'class-validator';
 
 export class SubmitRealNameDto {
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
-  @IsNotEmpty()
-  @Length(2, 30)
+  @IsNotEmpty({ message: '请填写姓名' })
+  @Length(1, 30)
   realName!: string;
 
-  /** 18 位身份证号；格式与校验码在 Service 层校验（见 id-card.util.ts），DTO 只做基础形状校验 */
+  /** 18 位大陆身份证号。校验码和出生日期在 Service 层校验，这里只约束长度。 */
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim().toUpperCase() : value,
+  )
   @IsString()
   @Length(18, 18)
   idCardNumber!: string;

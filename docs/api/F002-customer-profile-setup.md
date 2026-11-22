@@ -5,7 +5,7 @@ OpenSpec Change：`add-customer-profile-setup`（`openspec/changes/add-customer-
 
 **全部接口都需要登录**：请求头 `Authorization: Bearer <accessToken>`（登录接口见 F001）。
 
-> ⚠️ **实名认证说明**：当前阶段"实名"是用户自报（姓名 + 身份证号，仅做格式与校验码校验），**未经公安/OCR 真实核验**。身份证号本身加密存储（AES-256-GCM），不落明文，也绝不会出现在任何接口响应里；出生日期从身份证号解析得出，单独存储用于展示。真实实名认证能力上线后，这套过渡方案会被替换，不影响本文档描述的接口契约。
+> 姓名和身份证号在进入资料编辑之前提交，见 [F003](F003-customer-real-name-verification.md)。本期状态是「待核验」，资料接口用 `realNameStatus: "PENDING"` 表示，不返回 `realNameVerified`。身份证号加密存储，不会出现在资料响应里。出生日期从身份证号解析，只读。
 
 ## 字段取值说明
 
@@ -48,7 +48,7 @@ Required（Bearer Access Token）
   "code": 0,
   "message": "success",
   "data": {
-    "realNameVerified": true,
+    "realNameStatus": "PENDING",
     "realName": "张*",
     "birthDate": "1990-03-07T00:00:00.000Z",
     "phoneNumber": "138****8000",
@@ -83,28 +83,7 @@ Required（Bearer Access Token）
 }
 ```
 
-`realName`/`phoneNumber` 始终是脱敏后的值；`realNameVerified=false` 或未完成某一步时，对应字段为 `null`。
-
----
-
-## POST /customer/profile/real-name-placeholder
-
-### Description
-
-自报真实姓名 + 身份证号（实名认证过渡占位，见上方说明）。重复提交按最新一次覆盖。
-
-### Request
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| realName | string | Yes | 2-30 字符 |
-| idCardNumber | string | Yes | 18 位，含校验码 |
-
-### Error Codes
-
-| Code | HTTP Status | Description |
-|---|---|---|
-| 21005 | 400 | 身份证号格式或校验码不正确 |
+`realName`/`phoneNumber` 始终是脱敏后的值。`realNameStatus` 为 `null` 表示还没提交实名信息，为 `PENDING` 表示已提交、待核验。未完成某一步时，对应字段为 `null`。
 
 ---
 
@@ -127,7 +106,7 @@ Required（Bearer Access Token）
 
 | Code | HTTP Status | Description |
 |---|---|---|
-| 21004 | 403 | 尚未提交实名信息（见 real-name-placeholder） |
+| 21004 | 403 | 尚未提交实名信息（见 F003） |
 
 ---
 
@@ -199,7 +178,9 @@ Required（Bearer Access Token）
 
 ---
 
-## PATCH /customer/account/wechat-identity
+## PUT /customer/account/wechat-identity
+
+`PATCH /customer/account/wechat-identity` 与本接口等价。微信小程序 `wx.request` 不支持 PATCH，客户端使用 PUT。
 
 ### Description
 
@@ -220,5 +201,7 @@ Required（Bearer Access Token）
 |---|---|
 | 21001 | PROFILE_STEP_OUT_OF_ORDER |
 | 21003 | PROFILE_NOT_COMPLETE（供未来需要"资料已完成"才能访问的接口使用） |
-| 21004 | REALNAME_NOT_VERIFIED |
+| 21004 | REAL_NAME_NOT_SUBMITTED |
 | 21005 | ID_CARD_NUMBER_INVALID |
+| 21006 | ID_CARD_ALREADY_BOUND（见 F003） |
+| 21007 | REAL_NAME_LOCKED（见 F003） |

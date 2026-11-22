@@ -161,5 +161,8 @@ build/
 # Prisma generated client (regenerate via `pnpm prisma:generate`)
 src/generated/
 
+# 身份证照片密文。只在运行环境本地保存，不进仓库。
+storage/id-card-photos/
+
 
 /generated/prisma

@@ -44,6 +44,10 @@ export interface AppConfig {
     /** 32 字节 base64 密钥，用于加密身份证号等敏感个人信息（customer-profile） */
     piiEncryptionKey: string;
   };
+  storage: {
+    /** 身份证照片密文目录。不通过 HTTP 暴露。 */
+    idCardPhotoDir: string;
+  };
 }
 
 export default (): AppConfig => ({
@@ -81,5 +85,8 @@ export default (): AppConfig => ({
   },
   security: {
     piiEncryptionKey: process.env.PII_ENCRYPTION_KEY ?? '',
+  },
+  storage: {
+    idCardPhotoDir: process.env.ID_CARD_PHOTO_DIR ?? 'storage/id-card-photos',
   },
 });
