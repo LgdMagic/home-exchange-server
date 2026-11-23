@@ -61,7 +61,9 @@ Required（Bearer Access Token）
 
 ### Description
 
-上传身份证人像面或国徽面。同一面在提交实名信息之前再次上传会覆盖。已提交实名信息后不能再上传。照片加密后存在服务器本地，响应不返回文件地址。
+上传身份证人像面或国徽面。同一面在提交实名信息之前再次上传会覆盖。已提交实名信息后不能再上传。配置了对象存储时，原图写到私有桶 `id-cards/{账号}/{FRONT|BACK}`。未配置时仍把密文写在服务器本地。本接口不返回图片地址。
+
+图片格式校验仍暂停。空文件和超过 5MB 会拒绝。登录态对应的账号已经不存在时返回 401，需要重新登录。
 
 ### Authentication
 
@@ -73,7 +75,7 @@ Required（Bearer Access Token）
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| file | file | Yes | JPG 或 PNG，按文件头识别。单张不超过 5MB |
+| file | file | Yes | 单张不超过 5MB。格式校验暂停 |
 | side | string | Yes | `FRONT` 人像面，`BACK` 国徽面 |
 
 ### Response
@@ -91,8 +93,26 @@ Required（Bearer Access Token）
 | Code | HTTP Status | Description |
 |---|---|---|
 | 21007 | 409 | 实名信息已提交，不能再上传或更换照片 |
-| 21009 | 400 / 413 | 不是 JPG/PNG，或超过 5MB。超过 5MB 时 HTTP 状态是 413 |
-| 10400 | 400 | `side` 不是 `FRONT` 或 `BACK`，或没有文件 |
+| 21009 | 400 / 413 | 空文件，或超过 5MB。超过 5MB 时 HTTP 状态是 413 |
+| 10400 | 400 | `side` 不是 `FRONT` 或 `BACK` |
+
+---
+
+## GET /customer/real-name-verification/id-card-photo/access
+
+已登录即可调用。查询参数 `accountId` 可选；不传则查看当前账号。传入其他账号时，当前不校验是不是本人，供管理后台查看。返回 10 分钟有效的签名地址，不写入数据库。未上传的一面是 `null`。
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "frontUrl": "https://public-test-1385771692.cos.ap-guangzhou.myqcloud.com/id-cards/...",
+    "backUrl": null,
+    "expiresIn": 600
+  }
+}
+```
 
 ---
 
@@ -100,7 +120,7 @@ Required（Bearer Access Token）
 
 ### Description
 
-首次提交姓名和大陆身份证号。人像面和国徽面必须已经上传。通过基本校验后写入待核验记录，两张照片随记录锁定。同一账号再次提交会被拒绝，已保存的姓名、身份证号、出生日期和照片保持不变。同一个身份证号只能绑定一个账号。
+首次提交姓名和大陆身份证号。通过基本校验后写入待核验记录。图片上传服务跑通之前，人像面和国徽面还没上传也可以提交。同一账号再次提交会被拒绝，已保存的姓名、身份证号、出生日期和照片保持不变。同一个身份证号只能绑定一个账号。
 
 ### Request
 
@@ -127,7 +147,7 @@ Required（Bearer Access Token）
 | 21005 | 400 | 身份证号校验位错误，或其中的出生日期不存在、晚于当天 |
 | 21006 | 409 | 该身份证号已被其他账号使用。响应不包含对方账号的任何信息 |
 | 21007 | 409 | 当前账号已经提交过，不能修改或再次提交 |
-| 21008 | 400 | 人像面或国徽面还没上传。`message` 会指出缺的是哪一面 |
+| 21008 | 400 | 暂不返回。人像面或国徽面还没上传时，当前仍允许提交 |
 
 ---
 

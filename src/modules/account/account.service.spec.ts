@@ -9,10 +9,18 @@ function createPrismaMock() {
   } as unknown as PrismaService;
 }
 
+function storageMock() {
+  return {
+    enabled: false,
+    put: vi.fn(),
+    publicUrl: vi.fn(),
+  } as unknown as import('../../common/storage/object-storage.service.js').ObjectStorageService;
+}
+
 describe('AccountService', () => {
   it('updates only the provided fields', async () => {
     const prisma = createPrismaMock();
-    const service = new AccountService(prisma);
+    const service = new AccountService(prisma, storageMock());
 
     await service.updateWechatIdentity('account-1', { nickname: 'New Nick' });
 
@@ -24,7 +32,7 @@ describe('AccountService', () => {
 
   it('updates both fields when both are provided', async () => {
     const prisma = createPrismaMock();
-    const service = new AccountService(prisma);
+    const service = new AccountService(prisma, storageMock());
 
     await service.updateWechatIdentity('account-1', {
       nickname: 'New Nick',

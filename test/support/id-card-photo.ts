@@ -34,4 +34,26 @@ export async function removeIdCardPhotos(accountIds: string[]): Promise<void> {
       }),
     ),
   );
+
+  const bucket = process.env.COS_BUCKET;
+  const region = process.env.COS_REGION;
+  const secretId = process.env.COS_SECRET_ID;
+  const secretKey = process.env.COS_SECRET_KEY;
+  if (!bucket || !region || !secretId || !secretKey) return;
+
+  const { default: COS } = await import('cos-nodejs-sdk-v5');
+  const cos = new COS({ SecretId: secretId, SecretKey: secretKey });
+  await Promise.all(
+    accountIds.flatMap((accountId) =>
+      (['FRONT', 'BACK'] as const).map((side) =>
+        cos
+          .deleteObject({
+            Bucket: bucket,
+            Region: region,
+            Key: `id-cards/${accountId}/${side}`,
+          })
+          .catch(() => undefined),
+      ),
+    ),
+  );
 }

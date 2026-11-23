@@ -45,8 +45,15 @@ export interface AppConfig {
     piiEncryptionKey: string;
   };
   storage: {
-    /** 身份证照片密文目录。不通过 HTTP 暴露。 */
+    /** 身份证照片在未配置对象存储时的本地目录。不通过 HTTP 暴露。 */
     idCardPhotoDir: string;
+    cos: {
+      secretId: string;
+      secretKey: string;
+      region: string;
+      bucket: string;
+      cdnBaseUrl: string;
+    };
   };
 }
 
@@ -88,5 +95,12 @@ export default (): AppConfig => ({
   },
   storage: {
     idCardPhotoDir: process.env.ID_CARD_PHOTO_DIR ?? 'storage/id-card-photos',
+    cos: {
+      secretId: process.env.COS_SECRET_ID ?? '',
+      secretKey: process.env.COS_SECRET_KEY ?? '',
+      region: process.env.COS_REGION ?? '',
+      bucket: process.env.COS_BUCKET ?? '',
+      cdnBaseUrl: process.env.COS_CDN_BASE_URL ?? '',
+    },
   },
 });

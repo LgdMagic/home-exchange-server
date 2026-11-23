@@ -70,6 +70,7 @@ Backend Agent 的详细职责与规则见 [`.cursor/rules/backend.md`](.cursor/r
 - **`customer-real-name-verification`**（OpenSpec Change: `add-customer-real-name-verification`）：提交姓名、大陆身份证号，以及身份证人像面和国徽面。状态为待核验，提交后锁定，同一身份证号只能绑定一个账号。照片加密存在本地，接口不返回照片。详见 `docs/api/F003-customer-real-name-verification.md`。
   - 需要额外的环境变量：`PII_ENCRYPTION_KEY`（敏感个人信息加密密钥，32 字节 base64，同时用于 AES-256-GCM 和身份证号 HMAC，每个环境必须不同，一旦使用不可更换）。证件照片目录可用 `ID_CARD_PHOTO_DIR`，不配置时是 `storage/id-card-photos`。
 - **`living-days`**（OpenSpec Change: `add-living-days`）：Living Days 余额与首次交换权益包分开记账。一笔订单只能选用其中一样。会员只能查询，不能给自己加天数。详见 `docs/api/F004-living-days.md`。
+- **`home-feed`**（OpenSpec Change: `add-home-feed`）：首页展示内容。运营配置完成前返回随版本发布的编排文案，不建表。详见 `docs/api/F005-home-feed.md`。
 
 ## 本地开发
 

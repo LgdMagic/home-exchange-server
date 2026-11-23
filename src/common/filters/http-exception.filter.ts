@@ -61,6 +61,18 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     if (
       exception instanceof HttpException &&
       exception.getStatus() === HttpStatus.PAYLOAD_TOO_LARGE &&
+      requestUrl.includes('/customer/account/avatar')
+    ) {
+      return {
+        httpStatus: HttpStatus.PAYLOAD_TOO_LARGE,
+        code: CommonErrorCode.VALIDATION_ERROR,
+        message: '头像需为 5MB 以内的图片',
+      };
+    }
+
+    if (
+      exception instanceof HttpException &&
+      exception.getStatus() === HttpStatus.PAYLOAD_TOO_LARGE &&
       requestUrl.includes('/customer/real-name-verification/id-card-photo')
     ) {
       return {

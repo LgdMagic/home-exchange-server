@@ -1,3 +1,4 @@
+import { UnauthorizedException } from '@nestjs/common';
 import { Prisma } from '../../generated/prisma/client.js';
 import { RealNameVerificationStatus } from '../../generated/prisma/enums.js';
 import type { PiiEncryptionService } from '../../common/crypto/pii-encryption.service.js';
@@ -13,6 +14,9 @@ const OTHER_VALID_ID_CARD_NUMBER = '440302198501011232';
 
 function createPrismaMock() {
   const prisma = {
+    account: {
+      findUnique: vi.fn().mockResolvedValue({ id: 'account-1' }),
+    },
     accountRealNameVerification: {
       findUnique: vi.fn().mockResolvedValue(null),
       create: vi.fn().mockResolvedValue({}),
@@ -151,11 +155,9 @@ describe('RealNameVerificationService', () => {
       expect(prisma.accountRealNameVerification.create).not.toHaveBeenCalled();
     });
 
-    it('rejects submit when either side of the id card photo is missing', async () => {
+    it('allows submit while id card photos are not required', async () => {
       const prisma = createPrismaMock();
-      vi.mocked(prisma.realNameIdCardPhoto.findMany).mockResolvedValue([
-        { side: 'FRONT' },
-      ] as never);
+      vi.mocked(prisma.realNameIdCardPhoto.findMany).mockResolvedValue([]);
       const service = new RealNameVerificationService(
         prisma,
         createPiiEncryptionMock(),
@@ -163,15 +165,33 @@ describe('RealNameVerificationService', () => {
         photoStorageMock(),
       );
 
-      await expect(
-        service.submit('account-1', {
-          realName: '张三',
-          idCardNumber: VALID_ID_CARD_NUMBER,
-        }),
-      ).rejects.toMatchObject({
-        code: ProfileErrorCode.ID_CARD_PHOTOS_REQUIRED,
+      await service.submit('account-1', {
+        realName: '张三',
+        idCardNumber: VALID_ID_CARD_NUMBER,
       });
-      expect(prisma.accountRealNameVerification.create).not.toHaveBeenCalled();
+
+      expect(prisma.accountRealNameVerification.create).toHaveBeenCalled();
+    });
+
+    it('rejects a photo upload when the account has been removed', async () => {
+      const prisma = createPrismaMock();
+      vi.mocked(prisma.account.findUnique).mockResolvedValue(null);
+      const storage = photoStorageMock();
+      const service = new RealNameVerificationService(
+        prisma,
+        createPiiEncryptionMock(),
+        livingDaysMock(),
+        storage,
+      );
+
+      await expect(
+        service.saveIdCardPhoto(
+          'missing-account',
+          'FRONT',
+          Buffer.from([0xff, 0xd8, 0xff]),
+        ),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(storage.write).not.toHaveBeenCalled();
     });
 
     it('maps an id-card hash conflict to already-bound without including another account', async () => {

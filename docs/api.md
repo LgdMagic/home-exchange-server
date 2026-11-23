@@ -35,6 +35,7 @@ OpenSpec Change: `add-customer-profile-setup`（`openspec/changes/add-customer-p
 | PUT    | /customer/profile/lifestyle            | 提交我的生活方式（第 2 步）          | Client   | DONE   | api/F002-customer-profile-setup.md |
 | PUT    | /customer/profile/accommodation-travel | 提交住宿偏好+旅行风格（第 3 步）     | Client   | DONE   | api/F002-customer-profile-setup.md |
 | POST   | /customer/profile/complete             | 预览确认，标记资料完成（第 4 步）    | Client   | DONE   | api/F002-customer-profile-setup.md |
+| POST   | /customer/account/avatar               | 上传头像到对象存储                    | Client   | DONE   | api/F002-customer-profile-setup.md |
 | PUT    | /customer/account/wechat-identity      | 回填微信头像/昵称（小程序使用）      | Client   | DONE   | api/F002-customer-profile-setup.md |
 | PATCH  | /customer/account/wechat-identity      | 同上，与 PUT 等价                    | Client   | DONE   | api/F002-customer-profile-setup.md |
 
@@ -49,6 +50,7 @@ OpenSpec Change: `add-customer-real-name-verification`（`openspec/changes/add-c
 | Method | Path                             | Description                            | Consumer | Status | Detail                                      |
 | ------ | -------------------------------- | -------------------------------------- | -------- | ------ | ------------------------------------------- |
 | GET    | /customer/real-name-verification             | 查询是否已提交，以及正反面是否已上传           | Client   | DONE   | api/F003-customer-real-name-verification.md |
+| GET    | /customer/real-name-verification/id-card-photo/access | 获取身份证照片的 10 分钟签名地址     | Client   | DONE   | api/F003-customer-real-name-verification.md |
 | POST   | /customer/real-name-verification/id-card-photo | 上传身份证人像面或国徽面                       | Client   | DONE   | api/F003-customer-real-name-verification.md |
 | POST   | /customer/real-name-verification             | 提交姓名、身份证号和已上传的正反面，记为待核验 | Client   | DONE   | api/F003-customer-real-name-verification.md |
 
@@ -61,6 +63,16 @@ OpenSpec Change: `add-living-days`（`openspec/changes/add-living-days/`）
 | Method | Path                  | Description                           | Consumer | Status | Detail                  |
 | ------ | --------------------- | ------------------------------------- | -------- | ------ | ----------------------- |
 | GET    | /customer/living-days | 查询 Living Days 余额和首次交换权益包 | Client   | DONE   | api/F004-living-days.md |
+
+## F005 Home Feed
+
+OpenSpec Change: `add-home-feed`（`openspec/changes/add-home-feed/`）
+
+不需要登录。运营配置完成前只返回编排好的展示内容。
+
+| Method | Path                | Description                             | Consumer | Status | Detail                |
+| ------ | ------------------- | --------------------------------------- | -------- | ------ | --------------------- |
+| GET    | /customer/home-feed | 首页今日推荐、灵感、故事、周末、Belong | Client   | DONE   | api/F005-home-feed.md |
 
 <!--
 后续新增 API 时，按能力/模块分组追加表格，例如：

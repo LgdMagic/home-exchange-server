@@ -37,7 +37,8 @@ export const HOME_TYPE_OPTIONS = [
   'APARTMENT', // 公寓
   'GARDEN_HOUSE', // 花园洋房
   'LOFT_DUPLEX', // 复式/LOFT
-  'VILLA_TOWNHOUSE', // 独栋/联排别墅
+  'DETACHED_HOUSE', // 独栋别墅
+  'TOWNHOUSE', // 联排别墅
   'COURTYARD', // 院落/四合院
   'HERITAGE_HOUSE', // 老洋房/老宅
   'UNIQUE_STAY', // 特色住宅

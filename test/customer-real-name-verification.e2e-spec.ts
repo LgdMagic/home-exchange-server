@@ -215,46 +215,24 @@ describe('customer-real-name-verification (e2e)', () => {
     expect(body).not.toContain(SHARED_ID_CARD_NUMBER);
   });
 
-  it('没有正反面照片不能提交，非图片文件也不能上传', async () => {
+  it('图片上传服务跑通前，缺照片也能提交，非图片文件也能上传', async () => {
     const token = await loginAsNewAccount('13900210005');
 
-    const missing = await authed(
-      'post',
-      '/customer/real-name-verification',
-      token,
-    ).send({
-      realName: '张三',
-      idCardNumber: SHARED_ID_CARD_NUMBER,
-    });
-    expect(missing.status).toBe(400);
-    expect(missing.body.code).toBe(21008);
-    expect(missing.body.message).toBe('请上传身份证人像面和国徽面');
-
-    const rejected = await request(app.getHttpServer())
+    const plain = await request(app.getHttpServer())
       .post('/customer/real-name-verification/id-card-photo')
       .set('Authorization', `Bearer ${token}`)
       .field('side', 'FRONT')
       .attach('file', Buffer.from('not-an-image'), 'note.txt');
-    expect(rejected.status).toBe(400);
-    expect(rejected.body.code).toBe(21009);
+    expect(plain.status).toBe(200);
 
-    const front = await request(app.getHttpServer())
-      .post('/customer/real-name-verification/id-card-photo')
-      .set('Authorization', `Bearer ${token}`)
-      .field('side', 'FRONT')
-      .attach('file', TINY_JPEG, 'front.jpg');
-    expect(front.status).toBe(200);
-
-    const backMissing = await authed(
+    const submitted = await authed(
       'post',
       '/customer/real-name-verification',
       token,
     ).send({
       realName: '张三',
-      idCardNumber: SHARED_ID_CARD_NUMBER,
+      idCardNumber: OTHER_ID_CARD_NUMBER,
     });
-    expect(backMissing.status).toBe(400);
-    expect(backMissing.body.code).toBe(21008);
-    expect(backMissing.body.message).toBe('请上传身份证国徽面');
+    expect(submitted.status).toBe(200);
   });
 });

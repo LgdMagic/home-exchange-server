@@ -7,10 +7,14 @@ import Joi from 'joi';
  * （uri/port 等内置校验），同时兼容当前 @nestjs/config 的类型约束。
  */
 const envSchema = Joi.object({
-  NODE_ENV: Joi.string().valid('development', 'test', 'production').default('development'),
+  NODE_ENV: Joi.string()
+    .valid('development', 'test', 'production')
+    .default('development'),
   // 未显式设置时在 configuration.ts 里回退到 NODE_ENV，这里允许留空；
   // 与 NODE_ENV 分开校验，见 configuration.ts 中 app.appEnv 的说明。
-  APP_ENV: Joi.string().valid('development', 'test', 'staging', 'production').optional(),
+  APP_ENV: Joi.string()
+    .valid('development', 'test', 'staging', 'production')
+    .optional(),
   PORT: Joi.number().port().default(3000),
 
   DATABASE_URL: Joi.string()
@@ -37,9 +41,21 @@ const envSchema = Joi.object({
 
   // customer-profile（OpenSpec Change: add-customer-profile-setup）
   PII_ENCRYPTION_KEY: Joi.string().base64().required(),
+
+  // 腾讯云对象存储。一个环境一个私有桶。留空时证件照片仍落在本地目录。
+  COS_SECRET_ID: Joi.string().allow('').default(''),
+  COS_SECRET_KEY: Joi.string().allow('').default(''),
+  COS_REGION: Joi.string().allow('').default(''),
+  COS_BUCKET: Joi.string().allow('').default(''),
+  COS_CDN_BASE_URL: Joi.string()
+    .uri({ scheme: ['https'] })
+    .allow('')
+    .default(''),
 }).unknown(true);
 
-export function validateEnv(config: Record<string, unknown>): Record<string, unknown> {
+export function validateEnv(
+  config: Record<string, unknown>,
+): Record<string, unknown> {
   const { error, value } = envSchema.validate(config, { abortEarly: false });
 
   if (error) {

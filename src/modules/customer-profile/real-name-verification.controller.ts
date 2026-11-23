@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Query,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -13,6 +14,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { CurrentAccountId } from '../../common/decorators/current-account-id.decorator.js';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard.js';
 import type { IdCardPhotoSide } from '../../generated/prisma/enums.js';
+import { IdCardPhotoAccessQueryDto } from './dto/id-card-photo-access.query.js';
 import { SubmitRealNameDto } from './dto/submit-real-name.dto.js';
 import { UploadIdCardPhotoDto } from './dto/upload-id-card-photo.dto.js';
 import { MAX_ID_CARD_PHOTO_BYTES } from './id-card-photo.util.js';
@@ -37,6 +39,20 @@ export class RealNameVerificationController {
     @CurrentAccountId() accountId: string,
   ): Promise<RealNameVerificationView> {
     return this.realNameVerificationService.getView(accountId);
+  }
+
+  @Get('id-card-photo/access')
+  accessPhotos(
+    @CurrentAccountId() currentAccountId: string,
+    @Query() query: IdCardPhotoAccessQueryDto,
+  ): Promise<{
+    frontUrl: string | null;
+    backUrl: string | null;
+    expiresIn: number;
+  }> {
+    return this.realNameVerificationService.accessPhotoUrls(
+      query.accountId ?? currentAccountId,
+    );
   }
 
   @Post('id-card-photo')

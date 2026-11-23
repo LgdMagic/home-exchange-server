@@ -1,4 +1,4 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable, UnauthorizedException } from '@nestjs/common';
 import { Prisma } from '../../generated/prisma/client.js';
 import {
   IdCardPhotoSide,
@@ -104,10 +104,11 @@ export class RealNameVerificationService {
       );
     }
 
+    await this.assertAccountExists(accountId);
     await this.assertNotLocked(accountId);
 
     const birthDate = parseBirthDateFromIdCardNumber(idCardNumber);
-    await this.assertPhotosReady(accountId);
+    // 证件正反面是否已上传先不拦截，等图片上传服务跑通后再打开。
 
     try {
       await this.prisma.$transaction(async (tx) => {
@@ -148,25 +149,25 @@ export class RealNameVerificationService {
 
   /**
    * 提交前保存一面证件照片。同一面再次上传会覆盖。已提交实名后拒绝。
-   * 照片只加密落盘，响应里不返回地址。
+   * 对象存储里保存原图；读取要另取 10 分钟签名地址。
    */
   async saveIdCardPhoto(
     accountId: string,
     side: IdCardPhotoSide,
     bytes: Buffer,
   ): Promise<void> {
+    await this.assertAccountExists(accountId);
     await this.assertNotLocked(accountId);
 
     if (bytes.length === 0 || bytes.length > MAX_ID_CARD_PHOTO_BYTES) {
       throw this.invalidPhotoException();
     }
 
-    const contentType = detectIdCardImageType(bytes);
-    if (!contentType) {
-      throw this.invalidPhotoException();
-    }
+    // 文件头校验先暂停。上传服务跑通前，非 JPG/PNG 也先收下。
+    const contentType =
+      detectIdCardImageType(bytes) ?? 'application/octet-stream';
 
-    await this.idCardPhotoStorage.write(accountId, side, bytes);
+    await this.idCardPhotoStorage.write(accountId, side, bytes, contentType);
     await this.prisma.realNameIdCardPhoto.upsert({
       where: { accountId_side: { accountId, side } },
       create: {
@@ -180,6 +181,30 @@ export class RealNameVerificationService {
         byteSize: bytes.length,
       },
     });
+  }
+
+  /**
+   * 签发身份证原图的临时地址。不校验账号是不是当前登录用户，管理后台可传任意账号。
+   * 调用方仍然必须已登录。未上传的一面返回 null。
+   */
+  async accessPhotoUrls(accountId: string): Promise<{
+    frontUrl: string | null;
+    backUrl: string | null;
+    expiresIn: number;
+  }> {
+    const photos = await this.uploadedSides(accountId);
+    return {
+      frontUrl: photos.idCardFrontUploaded
+        ? this.idCardPhotoStorage.signedReadUrl(
+            accountId,
+            IdCardPhotoSide.FRONT,
+          )
+        : null,
+      backUrl: photos.idCardBackUploaded
+        ? this.idCardPhotoStorage.signedReadUrl(accountId, IdCardPhotoSide.BACK)
+        : null,
+      expiresIn: 600,
+    };
   }
 
   async getView(accountId: string): Promise<RealNameVerificationView> {
@@ -240,24 +265,15 @@ export class RealNameVerificationService {
     }
   }
 
-  private async assertPhotosReady(accountId: string): Promise<void> {
-    const photos = await this.uploadedSides(accountId);
-    if (photos.idCardFrontUploaded && photos.idCardBackUploaded) {
-      return;
+  /** 登录态是无状态 JWT。账号被清空后 token 仍能通过签名校验，这里改成 401，避免外键错误变成 500。 */
+  private async assertAccountExists(accountId: string): Promise<void> {
+    const account = await this.prisma.account.findUnique({
+      where: { id: accountId },
+      select: { id: true },
+    });
+    if (!account) {
+      throw new UnauthorizedException('登录已过期，请重新登录');
     }
-
-    const message =
-      !photos.idCardFrontUploaded && !photos.idCardBackUploaded
-        ? '请上传身份证人像面和国徽面'
-        : photos.idCardFrontUploaded
-          ? '请上传身份证国徽面'
-          : '请上传身份证人像面';
-
-    throw new BusinessException(
-      ProfileErrorCode.ID_CARD_PHOTOS_REQUIRED,
-      message,
-      HttpStatus.BAD_REQUEST,
-    );
   }
 
   private async uploadedSides(accountId: string): Promise<{

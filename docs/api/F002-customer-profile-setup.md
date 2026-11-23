@@ -21,7 +21,7 @@ OpenSpec Change：`add-customer-profile-setup`（`openspec/changes/add-customer-
 | `petAttitude` | `LIKE` \| `ACCEPTABLE` \| `DISLIKE` | 喜欢 / 可以接受 / 不太接受 |
 | `lifestyleTidiness` | `TIDY` \| `CLEAN_ENOUGH` \| `CASUAL` | 整洁有序 / 干净即可 / 随性自然 |
 | `interests`（多选） | `PHOTOGRAPHY` `HIKING` `COFFEE` `READING` `MUSIC` `ART` `TRAVEL` `COOKING` `MOVIES` `CYCLING` `CAMPING` `CITY_WALK` | 摄影/徒步/咖啡/阅读/音乐/艺术/旅行/做饭/电影/骑行/露营/城市漫游 |
-| `homeTypes`（多选） | `URBAN_RESIDENCE` `APARTMENT` `GARDEN_HOUSE` `LOFT_DUPLEX` `VILLA_TOWNHOUSE` `COURTYARD` `HERITAGE_HOUSE` `UNIQUE_STAY` | 城市住宅/公寓/花园洋房/复式LOFT/独栋联排别墅/院落四合院/老洋房老宅/特色住宅 |
+| `homeTypes`（多选） | `URBAN_RESIDENCE` `APARTMENT` `GARDEN_HOUSE` `LOFT_DUPLEX` `DETACHED_HOUSE` `TOWNHOUSE` `COURTYARD` `HERITAGE_HOUSE` `UNIQUE_STAY` | 城市住宅/公寓/花园洋房/复式LOFT/独栋别墅/联排别墅/院落四合院/老洋房老宅/特色住宅 |
 | `spaceFeatures`（多选） | `YARD` `PLANTS_FLOWERS` `BALCONY` `TERRACE` `QUIET` `GOOD_LIGHT` `GOOD_VENTILATION` `NATURE_VIEW` `KITCHEN` `OUTDOOR_SPACE` | 有院子/有鲜花植物/有阳台/有露台/安静/采光好/通风好/有自然景观/有厨房/有户外空间 |
 | `livingNeeds`（多选） | `SMOKE_FREE` `SOFT_BED` `KITCHEN` `WIFI` `WASHING_MACHINE` `LONG_TERM_FRIENDLY` `PET_FRIENDLY` | 无烟/喜欢软床/有厨房/有WiFi/有洗衣机/适合长住/宠物友好 |
 | `travelCompanions`（多选） | `SOLO` `WITH_FRIENDS` `WITH_PARTNER` `WITH_FAMILY` | 独自旅行/和朋友一起/和伴侣一起/和家人一起 |
@@ -175,6 +175,26 @@ Required（Bearer Access Token）
 | Code | HTTP Status | Description |
 |---|---|---|
 | 21001 | 400 | 尚未完成「住宿偏好与旅行风格」步骤 |
+
+---
+
+## POST /customer/account/avatar
+
+### Description
+
+上传头像到对象存储的 `avatars/` 目录，并把账号上的 `avatarUrl` 写成 CDN 地址。需要登录。文件字段名是 `file`，单张不超过 5MB。
+
+### Response
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": { "avatarUrl": "https://imgtest.wandercat.cn/avatars/账号/文件.jpg" }
+}
+```
+
+桶是私有读。这个地址要能打开，CDN 需要开启回源鉴权。
 
 ---
 
