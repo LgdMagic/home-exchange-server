@@ -1,4 +1,9 @@
-import { HttpStatus, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  HttpStatus,
+  Inject,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Prisma } from '../../generated/prisma/client.js';
 import {
   IdCardPhotoSide,
@@ -20,6 +25,7 @@ import {
   MAX_ID_CARD_PHOTO_BYTES,
 } from './id-card-photo.util.js';
 import { IdCardPhotoStorage } from './id-card-photo.storage.js';
+import { ID_CARD_VERIFIER, type IdCardVerifier } from './id-card-verifier.js';
 import { maskRealName } from './mask.util.js';
 
 export interface RealNameInfo {
@@ -36,9 +42,6 @@ export interface RealNameVerificationView {
   idCardFrontUploaded: boolean;
   idCardBackUploaded: boolean;
 }
-
-/** 用户自报，本期不调用第三方核验。 */
-const SELF_REPORTED_SOURCE = 'SELF_REPORTED';
 
 const EMPTY_VIEW: RealNameVerificationView = {
   submitted: false,
@@ -79,10 +82,12 @@ export class RealNameVerificationService {
     private readonly piiEncryptionService: PiiEncryptionService,
     private readonly livingDaysService: LivingDaysService,
     private readonly idCardPhotoStorage: IdCardPhotoStorage,
+    @Inject(ID_CARD_VERIFIER)
+    private readonly idCardVerifier: IdCardVerifier,
   ) {}
 
   /**
-   * 首次提交姓名 + 大陆身份证号，状态记为待核验。
+   * 首次提交姓名 + 大陆身份证号。先做腾讯云二要素核验，一致后才写入。
    * 同一账号再次提交直接拒绝，不覆盖已保存的姓名、身份证号和出生日期。
    */
   async submit(accountId: string, dto: SubmitRealNameDto): Promise<void> {
@@ -108,7 +113,13 @@ export class RealNameVerificationService {
     await this.assertNotLocked(accountId);
 
     const birthDate = parseBirthDateFromIdCardNumber(idCardNumber);
-    // 证件正反面是否已上传先不拦截，等图片上传服务跑通后再打开。
+    const verification = await this.idCardVerifier.verify(
+      realName,
+      idCardNumber,
+    );
+    if (!verification.matched) {
+      throw this.verificationException(verification.result);
+    }
 
     try {
       await this.prisma.$transaction(async (tx) => {
@@ -121,8 +132,9 @@ export class RealNameVerificationService {
             idCardNumberHash:
               this.piiEncryptionService.hmacSha256(idCardNumber),
             birthDate,
-            status: RealNameVerificationStatus.PENDING,
-            source: SELF_REPORTED_SOURCE,
+            status: RealNameVerificationStatus.VERIFIED,
+            source: verification.source,
+            verifiedAt: new Date(),
           },
         });
         await this.livingDaysService.grantIfEligible(accountId, tx);
@@ -289,6 +301,47 @@ export class RealNameVerificationService {
       idCardFrontUploaded: sides.has(IdCardPhotoSide.FRONT),
       idCardBackUploaded: sides.has(IdCardPhotoSide.BACK),
     };
+  }
+
+  private verificationException(result: string): BusinessException {
+    switch (result) {
+      case '-1':
+        return new BusinessException(
+          ProfileErrorCode.ID_CARD_NAME_MISMATCH,
+          '姓名与身份证号不一致',
+          HttpStatus.BAD_REQUEST,
+        );
+      case '-2':
+        return new BusinessException(
+          ProfileErrorCode.ID_CARD_NUMBER_INVALID,
+          '身份证号格式不正确',
+          HttpStatus.BAD_REQUEST,
+        );
+      case '-3':
+        return new BusinessException(
+          CommonErrorCode.VALIDATION_ERROR,
+          '姓名格式不正确',
+          HttpStatus.BAD_REQUEST,
+        );
+      case '-5':
+        return new BusinessException(
+          ProfileErrorCode.ID_CARD_NAME_MISMATCH,
+          '证件库中无此身份证记录',
+          HttpStatus.BAD_REQUEST,
+        );
+      case '-7':
+        return new BusinessException(
+          ProfileErrorCode.ID_CARD_VERIFICATION_UNAVAILABLE,
+          '今日核验次数已用完，请明天再试',
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      default:
+        return new BusinessException(
+          ProfileErrorCode.ID_CARD_VERIFICATION_UNAVAILABLE,
+          '实名核验暂不可用，请稍后再试',
+          HttpStatus.SERVICE_UNAVAILABLE,
+        );
+    }
   }
 
   private invalidPhotoException(): BusinessException {

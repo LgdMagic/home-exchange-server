@@ -40,6 +40,15 @@ function livingDaysMock() {
   } as unknown as LivingDaysService;
 }
 
+function idCardVerifierMock() {
+  return {
+    verify: vi.fn().mockResolvedValue({
+      matched: true,
+      source: 'TENCENT_ID_CARD_VERIFICATION',
+    }),
+  } as unknown as import('./id-card-verifier.js').IdCardVerifier;
+}
+
 function photoStorageMock() {
   return {
     write: vi.fn().mockResolvedValue(undefined),
@@ -71,6 +80,7 @@ describe('RealNameVerificationService', () => {
         pii,
         livingDaysMock(),
         photoStorageMock(),
+        idCardVerifierMock(),
       );
 
       await expect(
@@ -90,6 +100,7 @@ describe('RealNameVerificationService', () => {
         pii,
         livingDaysMock(),
         photoStorageMock(),
+        idCardVerifierMock(),
       );
 
       await expect(
@@ -111,6 +122,7 @@ describe('RealNameVerificationService', () => {
         pii,
         livingDaysMock(),
         photoStorageMock(),
+        idCardVerifierMock(),
       );
 
       await service.submit('account-1', {
@@ -126,11 +138,38 @@ describe('RealNameVerificationService', () => {
           realName: '张三',
           idCardNumberEncrypted: 'encrypted(11010119900307854X)',
           idCardNumberHash: 'hmac(11010119900307854X)',
-          source: 'SELF_REPORTED',
-          status: RealNameVerificationStatus.PENDING,
+          source: 'TENCENT_ID_CARD_VERIFICATION',
+          status: RealNameVerificationStatus.VERIFIED,
+          verifiedAt: expect.any(Date),
           birthDate: new Date(Date.UTC(1990, 2, 7)),
         }),
       });
+    });
+
+    it('does not save the record when the name and id card do not match', async () => {
+      const prisma = createPrismaMock();
+      const verifier = idCardVerifierMock();
+      vi.mocked(verifier.verify).mockResolvedValue({
+        matched: false,
+        result: '-1',
+      });
+      const service = new RealNameVerificationService(
+        prisma,
+        createPiiEncryptionMock(),
+        livingDaysMock(),
+        photoStorageMock(),
+        verifier,
+      );
+
+      await expect(
+        service.submit('account-1', {
+          realName: '张三',
+          idCardNumber: VALID_ID_CARD_NUMBER,
+        }),
+      ).rejects.toMatchObject({
+        code: ProfileErrorCode.ID_CARD_NAME_MISMATCH,
+      });
+      expect(prisma.accountRealNameVerification.create).not.toHaveBeenCalled();
     });
 
     it('rejects a second submit for the same account without writing again', async () => {
@@ -144,6 +183,7 @@ describe('RealNameVerificationService', () => {
         pii,
         livingDaysMock(),
         photoStorageMock(),
+        idCardVerifierMock(),
       );
 
       await expect(
@@ -163,6 +203,7 @@ describe('RealNameVerificationService', () => {
         createPiiEncryptionMock(),
         livingDaysMock(),
         photoStorageMock(),
+        idCardVerifierMock(),
       );
 
       await service.submit('account-1', {
@@ -182,6 +223,7 @@ describe('RealNameVerificationService', () => {
         createPiiEncryptionMock(),
         livingDaysMock(),
         storage,
+        idCardVerifierMock(),
       );
 
       await expect(
@@ -205,6 +247,7 @@ describe('RealNameVerificationService', () => {
         pii,
         livingDaysMock(),
         photoStorageMock(),
+        idCardVerifierMock(),
       );
 
       await expect(
@@ -233,6 +276,7 @@ describe('RealNameVerificationService', () => {
         pii,
         livingDaysMock(),
         photoStorageMock(),
+        idCardVerifierMock(),
       );
 
       await expect(
@@ -254,6 +298,7 @@ describe('RealNameVerificationService', () => {
         pii,
         livingDaysMock(),
         photoStorageMock(),
+        idCardVerifierMock(),
       );
 
       await expect(
@@ -274,6 +319,7 @@ describe('RealNameVerificationService', () => {
         createPiiEncryptionMock(),
         livingDaysMock(),
         photoStorageMock(),
+        idCardVerifierMock(),
       );
 
       await expect(service.getView('account-1')).resolves.toEqual({
@@ -301,6 +347,7 @@ describe('RealNameVerificationService', () => {
         createPiiEncryptionMock(),
         livingDaysMock(),
         photoStorageMock(),
+        idCardVerifierMock(),
       );
 
       await expect(service.getView('account-1')).resolves.toEqual({
@@ -331,6 +378,7 @@ describe('RealNameVerificationService', () => {
         createPiiEncryptionMock(),
         livingDaysMock(),
         photoStorageMock(),
+        idCardVerifierMock(),
       );
 
       await expect(service.assertSubmitted('account-1')).resolves.toEqual({
@@ -347,6 +395,7 @@ describe('RealNameVerificationService', () => {
         createPiiEncryptionMock(),
         livingDaysMock(),
         photoStorageMock(),
+        idCardVerifierMock(),
       );
 
       await expect(service.assertSubmitted('account-1')).rejects.toMatchObject({

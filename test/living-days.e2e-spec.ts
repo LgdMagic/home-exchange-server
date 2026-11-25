@@ -34,6 +34,7 @@ describe('living-days (e2e)', () => {
   const SPENDER_ID_CARD = '120101199111113332';
 
   beforeAll(async () => {
+    process.env.FACEID_TEST_MODE = 'true';
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();

@@ -26,6 +26,7 @@ describe('customer-real-name-verification (e2e)', () => {
   const OTHER_ID_CARD_NUMBER = '510104199512123453';
 
   beforeAll(async () => {
+    process.env.FACEID_TEST_MODE = 'true';
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -152,7 +153,7 @@ describe('customer-real-name-verification (e2e)', () => {
       ownerToken,
     );
     expect(view.body.data.submitted).toBe(true);
-    expect(view.body.data.status).toBe('PENDING');
+    expect(view.body.data.status).toBe('VERIFIED');
     expect(view.body.data.realName).toBe('张*');
     expect(view.body.data.idCardFrontUploaded).toBe(true);
     expect(view.body.data.idCardBackUploaded).toBe(true);

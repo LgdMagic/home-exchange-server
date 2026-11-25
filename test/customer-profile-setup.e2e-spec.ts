@@ -50,6 +50,7 @@ describe('customer-profile-setup (e2e)', () => {
   };
 
   beforeAll(async () => {
+    process.env.FACEID_TEST_MODE = 'true';
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -246,7 +247,7 @@ describe('customer-profile-setup (e2e)', () => {
 
     const profile = await authed('get', '/customer/profile', token).send();
     expect(profile.status).toBe(200);
-    expect(profile.body.data.realNameStatus).toBe('PENDING');
+    expect(profile.body.data.realNameStatus).toBe('VERIFIED');
     expect(profile.body.data).not.toHaveProperty('realNameVerified');
     expect(profile.body.data.realName).toBe('张*'); // 脱敏，只保留姓氏
     // 手机号脱敏：13900110004（11 位）-> 前 3 后 4，中间用 * 遮盖 -> 139****0004

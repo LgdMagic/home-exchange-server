@@ -27,6 +27,12 @@ export interface AppConfig {
     /** 测试期固定验证码开关（999999，不发送真实短信），生产环境必须为 false */
     smsTestMode: boolean;
   };
+  faceid: {
+    /** 非生产环境可跳过腾讯云二要素核验。生产环境必须为 false。 */
+    testMode: boolean;
+    secretId: string;
+    secretKey: string;
+  };
   wechat: {
     miniAppId: string;
     miniAppSecret: string;
@@ -76,6 +82,11 @@ export default (): AppConfig => ({
   },
   auth: {
     smsTestMode: (process.env.AUTH_SMS_TEST_MODE ?? 'true') === 'true',
+  },
+  faceid: {
+    testMode: (process.env.FACEID_TEST_MODE ?? 'true') === 'true',
+    secretId: process.env.TENCENT_FACEID_SECRET_ID ?? '',
+    secretKey: process.env.TENCENT_FACEID_SECRET_KEY ?? '',
   },
   wechat: {
     miniAppId: process.env.WECHAT_MINI_APP_ID ?? '',

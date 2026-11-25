@@ -5,7 +5,9 @@ OpenSpec Change：`add-customer-real-name-verification`（`openspec/changes/add-
 
 **全部接口都需要登录**：请求头 `Authorization: Bearer <accessToken>`（登录接口见 F001）。
 
-本期做姓名、大陆 18 位身份证号，以及身份证人像面、国徽面。不调用第三方核验，也不把照片送检。提交成功后状态是 `PENDING`（待核验）。任何接口都不返回「已实名认证」。身份证号和证件照片都用 AES-256-GCM 加密存储。响应里不出现身份证号明文或密文，也不出现照片内容和文件地址。
+本期做姓名、大陆 18 位身份证号，以及身份证人像面、国徽面。提交时调用腾讯云身份信息认证（二要素核验），只传姓名和身份证号，不传证件照片。核验一致后状态是 `VERIFIED`，并写入 `verifiedAt`。不一致或证件库没有记录时不保存。任何接口都不返回「已实名认证」这句文案。身份证号用 AES-256-GCM 加密存储。响应里不出现身份证号明文或密文，也不出现照片内容和文件地址。
+
+非生产环境可以设置 `FACEID_TEST_MODE=true` 跳过腾讯云调用。生产环境必须关闭该开关并配置 `TENCENT_FACEID_SECRET_ID` / `TENCENT_FACEID_SECRET_KEY`。
 
 ## GET /customer/real-name-verification
 
@@ -44,7 +46,7 @@ Required（Bearer Access Token）
   "message": "success",
   "data": {
     "submitted": true,
-    "status": "PENDING",
+    "status": "VERIFIED",
     "realName": "张*",
     "birthDate": "1996-08-15T00:00:00.000Z",
     "idCardFrontUploaded": true,
@@ -53,7 +55,7 @@ Required（Bearer Access Token）
 }
 ```
 
-`status` 只有 `null` 和 `PENDING`。`realName` 是脱敏值。`birthDate` 从身份证号第 7–14 位解析。`idCardFrontUploaded` 是人像面，`idCardBackUploaded` 是国徽面。未提交时也可以是 `true`，表示这一面已经传过、还可以更换。
+`status` 为 `null` 表示还没提交，为 `VERIFIED` 表示二要素核验已通过。`realName` 是脱敏值。`birthDate` 从身份证号第 7–14 位解析。`idCardFrontUploaded` 是人像面，`idCardBackUploaded` 是国徽面。未提交时也可以是 `true`，表示这一面已经传过、还可以更换。
 
 ---
 
@@ -144,7 +146,9 @@ Required（Bearer Access Token）
 | Code | HTTP Status | Description |
 |---|---|---|
 | 10400 | 400 | 姓名为空，或身份证号长度不是 18 位 |
-| 21005 | 400 | 身份证号校验位错误，或其中的出生日期不存在、晚于当天 |
+| 21005 | 400 | 身份证号校验位错误，或其中的出生日期不存在、晚于当天，或腾讯云返回非法身份证号 |
+| 21010 | 400 | 姓名与身份证号不一致，或证件库中无此身份证记录 |
+| 21011 | 429 / 503 | 今日核验次数已用完，或核验服务暂不可用。次数用完时 HTTP 状态是 429 |
 | 21006 | 409 | 该身份证号已被其他账号使用。响应不包含对方账号的任何信息 |
 | 21007 | 409 | 当前账号已经提交过，不能修改或再次提交 |
 | 21008 | 400 | 暂不返回。人像面或国徽面还没上传时，当前仍允许提交 |
@@ -161,3 +165,5 @@ Required（Bearer Access Token）
 | 21007 | REAL_NAME_LOCKED |
 | 21008 | ID_CARD_PHOTOS_REQUIRED |
 | 21009 | ID_CARD_PHOTO_INVALID |
+| 21010 | ID_CARD_NAME_MISMATCH |
+| 21011 | ID_CARD_VERIFICATION_UNAVAILABLE |

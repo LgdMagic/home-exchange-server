@@ -59,9 +59,10 @@ enum ProfileSetupStep {
   COMPLETED
 }
 
-/// 实名认证状态。本期只写入 PENDING（待核验），不表示已通过第三方核验。
+/// 实名认证状态。VERIFIED 表示腾讯云二要素核验姓名与身份证号一致，不是人脸核身。
 enum RealNameVerificationStatus {
   PENDING
+  VERIFIED
 }
 
 /// 账号实名信息（OpenSpec Change: add-customer-real-name-verification）。
@@ -79,9 +80,9 @@ model AccountRealNameVerification {
   /// 从身份证号第 7-14 位解析得出，未加密存储，供资料展示直接读取
   birthDate             DateTime                   @map("birth_date")
   status                RealNameVerificationStatus @default(PENDING)
-  /// SELF_REPORTED：用户自报，本期不做第三方核验
+  /// TENCENT_ID_CARD_VERIFICATION：腾讯云二要素核验通过。FACEID_TEST_MODE：非生产环境跳过远程核验。
   source                String                     @map("source")
-  /// 留给后续第三方核验写入。待核验记录保持为空，不能用它判断「已实名认证」
+  /// 二要素核验通过的时间。未通过的记录不会写入。
   verifiedAt            DateTime?                  @map("verified_at")
   createdAt             DateTime                   @default(now()) @map("created_at")
   updatedAt             DateTime                   @updatedAt @map("updated_at")

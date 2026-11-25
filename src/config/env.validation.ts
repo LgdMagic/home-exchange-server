@@ -38,6 +38,9 @@ const envSchema = Joi.object({
   TENCENT_SMS_SDK_APP_ID: Joi.string().allow('').default(''),
   TENCENT_SMS_SIGN_NAME: Joi.string().allow('').default(''),
   TENCENT_SMS_TEMPLATE_ID: Joi.string().allow('').default(''),
+  FACEID_TEST_MODE: Joi.string().valid('true', 'false').default('true'),
+  TENCENT_FACEID_SECRET_ID: Joi.string().allow('').default(''),
+  TENCENT_FACEID_SECRET_KEY: Joi.string().allow('').default(''),
 
   // customer-profile（OpenSpec Change: add-customer-profile-setup）
   PII_ENCRYPTION_KEY: Joi.string().base64().required(),
